@@ -1,0 +1,34 @@
+{
+  "name": "minichord-wasm",
+  "version": "0.1.0",
+  "description": "MiniChord firmware running in WebAssembly via C library shims",
+  "type": "module",
+  "scripts": {
+    "build": "./build.sh",
+    "dev": "python3 -m http.server 8000",
+    "clean": "rm -rf build/*"
+  },
+  "keywords": [
+    "wasm",
+    "web-audio",
+    "synthesizer",
+    "teensy",
+    "arduino"
+  ],
+  "author": "MiniChord WASM Port",
+  "license": "MIT",
+  "devDependencies": {},
+  "notes": {
+    "requirements": [
+      "Emscripten SDK (for compilation)",
+      "Python 3 (for dev server)",
+      "Modern browser with Web Audio API support"
+    ],
+    "browser_compatibility": {
+      "chrome": ">=66",
+      "firefox": ">=61",
+      "safari": ">=14.1",
+      "edge": ">=79"
+    }
+  }
+}

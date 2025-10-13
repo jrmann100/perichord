@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MiniChord WASM Test</title>
+    <style>
+      body {
+        font-family: "Courier New", monospace;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #00ff00;
+      }
+
+      h1 {
+        text-align: center;
+        color: #00ff00;
+        text-shadow: 0 0 10px #00ff00;
+      }
+
+      .container {
+        background: #000;
+        border: 2px solid #00ff00;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+
+      button {
+        background: #003300;
+        color: #00ff00;
+        border: 2px solid #00ff00;
+        padding: 10px 20px;
+        margin: 5px;
+        cursor: pointer;
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        border-radius: 5px;
+        transition: all 0.2s;
+      }
+
+      button:hover {
+        background: #00ff00;
+        color: #000;
+        box-shadow: 0 0 20px #00ff00;
+      }
+
+      button:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .control-group {
+        margin: 20px 0;
+      }
+
+      label {
+        display: inline-block;
+        width: 150px;
+        color: #00ff00;
+      }
+
+      input[type="range"] {
+        width: 300px;
+        vertical-align: middle;
+      }
+
+      .value-display {
+        display: inline-block;
+        width: 80px;
+        text-align: right;
+        color: #00ff00;
+      }
+
+      #console {
+        background: #000;
+        border: 1px solid #00ff00;
+        padding: 10px;
+        height: 200px;
+        overflow-y: auto;
+        font-size: 12px;
+        font-family: "Courier New", monospace;
+        color: #00ff00;
+      }
+
+      #console div {
+        margin: 2px 0;
+      }
+
+      .info {
+        color: #00ff00;
+      }
+
+      .warning {
+        color: #ffff00;
+      }
+
+      .error {
+        color: #ff0000;
+      }
+
+      .keyboard {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 5px;
+        margin: 20px 0;
+      }
+
+      .key {
+        aspect-ratio: 1;
+        background: #003300;
+        border: 2px solid #00ff00;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.1s;
+      }
+
+      .key:hover {
+        background: #004400;
+      }
+
+      .key.active {
+        background: #00ff00;
+        color: #000;
+        box-shadow: 0 0 20px #00ff00;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎹 MiniChord WASM Test 🎹</h1>
+
+    <div class="container">
+      <h2>System Status</h2>
+      <button id="init-btn">Initialize Audio System</button>
+      <button id="test-oscillator" disabled>Test Oscillator</button>
+      <button id="test-envelope" disabled>Test Envelope</button>
+      <div id="status" style="margin-top: 10px">Status: Not initialized</div>
+    </div>
+
+    <div class="container">
+      <h2>Virtual Keyboard (Harp Strings)</h2>
+      <p>Click to play notes</p>
+      <div class="keyboard" id="keyboard"></div>
+    </div>
+
+    <div class="container">
+      <h2>Audio Parameters</h2>
+
+      <div class="control-group">
+        <label>Oscillator Frequency:</label>
+        <input
+          type="range"
+          id="freq"
+          min="110"
+          max="1760"
+          value="440"
+          step="1"
+        />
+        <span class="value-display" id="freq-val">440 Hz</span>
+      </div>
+
+      <div class="control-group">
+        <label>Master Volume:</label>
+        <input type="range" id="volume" min="0" max="100" value="50" step="1" />
+        <span class="value-display" id="volume-val">50%</span>
+      </div>
+
+      <div class="control-group">
+        <label>Attack (ms):</label>
+        <input
+          type="range"
+          id="attack"
+          min="1"
+          max="1000"
+          value="10"
+          step="1"
+        />
+        <span class="value-display" id="attack-val">10 ms</span>
+      </div>
+
+      <div class="control-group">
+        <label>Release (ms):</label>
+        <input
+          type="range"
+          id="release"
+          min="10"
+          max="2000"
+          value="300"
+          step="10"
+        />
+        <span class="value-display" id="release-val">300 ms</span>
+      </div>
+    </div>
+
+    <div class="container">
+      <h2>Console Output</h2>
+      <div id="console"></div>
+    </div>
+
+    <script type="module">
+      import audioBridge from "./js/audio-bridge.js";
+
+      let wasmModule = null;
+      let testOscId = null;
+      let testEnvId = null;
+      let testGainId = null;
+
+      const noteNames = [
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B",
+      ];
+
+      // Console logging
+      const consoleDiv = document.getElementById("console");
+      function log(msg, type = "info") {
+        const div = document.createElement("div");
+        div.className = type;
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        consoleDiv.appendChild(div);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        console.log(msg);
+      }
+
+      // Initialize button
+      document
+        .getElementById("init-btn")
+        .addEventListener("click", async () => {
+          try {
+            log("Initializing Web Audio...", "info");
+            await audioBridge.init();
+            log("Web Audio initialized successfully!", "info");
+
+            document.getElementById("status").textContent = "Status: Ready";
+            document.getElementById("test-oscillator").disabled = false;
+            document.getElementById("test-envelope").disabled = false;
+            document.getElementById("init-btn").disabled = true;
+
+            createKeyboard();
+          } catch (e) {
+            log("Error initializing: " + e.message, "error");
+          }
+        });
+
+      // Test oscillator
+      document
+        .getElementById("test-oscillator")
+        .addEventListener("click", () => {
+          if (!testOscId) {
+            log("Creating test oscillator...", "info");
+            testOscId = 1000;
+            testGainId = 1001;
+
+            audioBridge.createObject(testOscId, "AudioSynthWaveform");
+            audioBridge.createObject(testGainId, "AudioAmplifier");
+            audioBridge.createObject(9999, "AudioOutputUSB");
+
+            audioBridge.connect(testOscId, 0, testGainId, 0);
+            audioBridge.connect(testGainId, 0, 9999, 0);
+
+            audioBridge.setParam(testOscId, "frequency", 440);
+            audioBridge.setParam(testOscId, "amplitude", 0.5);
+            audioBridge.setParam(testGainId, "gain", 0.5);
+
+            log("Oscillator playing at 440 Hz", "info");
+          }
+        });
+
+      // Test envelope
+      document.getElementById("test-envelope").addEventListener("click", () => {
+        if (!testEnvId) {
+          log("Creating test envelope...", "info");
+          testEnvId = 2000;
+
+          const oscId = 2001;
+          const outId = 2999;
+
+          audioBridge.createObject(oscId, "AudioSynthWaveform");
+          audioBridge.createObject(testEnvId, "AudioEffectEnvelope");
+          audioBridge.createObject(outId, "AudioOutputUSB");
+
+          audioBridge.connect(oscId, 0, testEnvId, 0);
+          audioBridge.connect(testEnvId, 0, outId, 0);
+
+          audioBridge.setParam(oscId, "frequency", 440);
+          audioBridge.setParam(oscId, "amplitude", 1.0);
+
+          log("Triggering envelope...", "info");
+          audioBridge.trigger(testEnvId, "noteOn", 1);
+
+          setTimeout(() => {
+            audioBridge.trigger(testEnvId, "noteOff", 0);
+          }, 1000);
+        }
+      });
+
+      // Create virtual keyboard
+      function createKeyboard() {
+        const keyboard = document.getElementById("keyboard");
+        keyboard.innerHTML = "";
+
+        for (let i = 0; i < 12; i++) {
+          const key = document.createElement("div");
+          key.className = "key";
+          key.textContent = noteNames[i];
+          key.dataset.note = i;
+
+          key.addEventListener("mousedown", () => playNote(i));
+          key.addEventListener("mouseup", () => stopNote(i));
+          key.addEventListener("mouseleave", () => stopNote(i));
+
+          keyboard.appendChild(key);
+        }
+      }
+
+      const activeNotes = new Map();
+      let outputId = null;
+
+      function playNote(noteIndex) {
+        if (activeNotes.has(noteIndex)) return;
+
+        // Ensure output exists
+        if (!outputId) {
+          outputId = 9999;
+          audioBridge.createObject(outputId, "AudioOutputUSB");
+          log("Created audio output destination", "info");
+        }
+
+        const baseFreq = 261.63; // C4
+        const freq = baseFreq * Math.pow(2, noteIndex / 12);
+
+        const oscId = 3000 + noteIndex * 10;
+        const envId = 3000 + noteIndex * 10 + 1;
+
+        audioBridge.createObject(oscId, "AudioSynthWaveform");
+        audioBridge.createObject(envId, "AudioEffectEnvelope");
+
+        audioBridge.connect(oscId, 0, envId, 0);
+        audioBridge.connect(envId, 0, outputId, 0);
+
+        audioBridge.setParam(oscId, "frequency", freq);
+        audioBridge.setParam(oscId, "amplitude", 0.3);
+
+        audioBridge.setParam(
+          envId,
+          "attack",
+          parseFloat(document.getElementById("attack").value)
+        );
+        audioBridge.setParam(
+          envId,
+          "release",
+          parseFloat(document.getElementById("release").value)
+        );
+
+        audioBridge.trigger(envId, "noteOn", 1);
+
+        activeNotes.set(noteIndex, { oscId, envId });
+        document
+          .querySelector(`[data-note="${noteIndex}"]`)
+          .classList.add("active");
+
+        log(`Note ON: ${noteNames[noteIndex]} (${freq.toFixed(1)} Hz)`, "info");
+      }
+
+      function stopNote(noteIndex) {
+        const note = activeNotes.get(noteIndex);
+        if (!note) return;
+
+        audioBridge.trigger(note.envId, "noteOff", 0);
+        activeNotes.delete(noteIndex);
+        document
+          .querySelector(`[data-note="${noteIndex}"]`)
+          .classList.remove("active");
+
+        log(`Note OFF: ${noteNames[noteIndex]}`, "info");
+      }
+
+      // Control handlers
+      document.getElementById("freq").addEventListener("input", (e) => {
+        const freq = e.target.value;
+        document.getElementById("freq-val").textContent = freq + " Hz";
+        if (testOscId) {
+          audioBridge.setParam(testOscId, "frequency", parseFloat(freq));
+        }
+      });
+
+      document.getElementById("volume").addEventListener("input", (e) => {
+        const vol = e.target.value / 100;
+        document.getElementById("volume-val").textContent =
+          e.target.value + "%";
+        if (testGainId) {
+          audioBridge.setParam(testGainId, "gain", vol);
+        }
+      });
+
+      document.getElementById("attack").addEventListener("input", (e) => {
+        document.getElementById("attack-val").textContent =
+          e.target.value + " ms";
+      });
+
+      document.getElementById("release").addEventListener("input", (e) => {
+        document.getElementById("release-val").textContent =
+          e.target.value + " ms";
+      });
+
+      log('Page loaded. Click "Initialize Audio System" to start.', "info");
+    </script>
+  </body>
+</html>
