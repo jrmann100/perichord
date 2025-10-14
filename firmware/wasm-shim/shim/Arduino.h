@@ -87,6 +87,8 @@ class IntervalTimer
 public:
     void begin(void (*f)(), unsigned long us) {}
     void end() {}
+    void priority(int p) {}
+    void update(unsigned long us) {}
 };
 
 template <typename T>
@@ -126,6 +128,7 @@ public:
     void print(const char *) {}
     void print(int) {}
     void begin(unsigned long) {}
+    void printf(const char *format, ...) {}
 };
 
 static SerialShim Serial;
@@ -138,42 +141,16 @@ static SerialShim Serial;
 void analogWrite(uint8_t pin, uint8_t value) {}
 void digitalWrite(uint8_t pin, uint8_t value) {}
 
-class usb_midi_class
+void pinMode(uint8_t pin, uint8_t mode) {};
+uint8_t digitalRead(uint8_t pin) { return LOW; };
+
+#define USB1_PORTSC1 0
+
+uint32_t random(uint32_t howbig)
 {
-public:
-    // Message type names for compatibility with Arduino MIDI library 4.3.1
-    enum MidiType
-    {
-        InvalidType = 0x00,
-        NoteOff = 0x80,
-        NoteOn = 0x90,
-        AfterTouchPoly = 0xA0,
-        ControlChange = 0xB0,
-        ProgramChange = 0xC0,
-        AfterTouchChannel = 0xD0,
-        PitchBend = 0xE0,
-        SystemExclusive = 0xF0,
-        TimeCodeQuarterFrame = 0xF1,
-        SongPosition = 0xF2,
-        SongSelect = 0xF3,
-        TuneRequest = 0xF6,
-        Clock = 0xF8,
-        Start = 0xFA,
-        Continue = 0xFB,
-        Stop = 0xFC,
-        ActiveSensing = 0xFE,
-        SystemReset = 0xFF
-    };
-
-    // Noop implementations for required functions
-    void sendSysEx(uint32_t length, const uint8_t *data, bool hasTerm = false, uint8_t cable = 0) {}
-    uint8_t getType(void) { return 0; }
-    uint16_t getSysExArrayLength(void) { return 0; }
-    uint8_t *getSysExArray(void) { return nullptr; }
-    void sendNoteOff(uint8_t note, uint8_t velocity, uint8_t channel, uint8_t cable = 0) {}
-    void sendNoteOn(uint8_t note, uint8_t velocity, uint8_t channel, uint8_t cable = 0) {}
-};
-
-static usb_midi_class usbMIDI;
+    if (howbig == 0)
+        return 0;
+    return random() % howbig;
+}
 
 #endif // ARDUINO_WASM_SHIM_H
