@@ -138,15 +138,16 @@ static SerialShim Serial;
 #define INPUT 0
 #define OUTPUT 1
 
-void analogWrite(uint8_t pin, uint8_t value) {}
-void digitalWrite(uint8_t pin, uint8_t value) {}
+// todo: inline should be replaced with extern once defined
+inline void analogWrite(uint8_t pin, uint8_t value) {}
+inline void digitalWrite(uint8_t pin, uint8_t value) {}
 
-void pinMode(uint8_t pin, uint8_t mode) {};
-uint8_t digitalRead(uint8_t pin) { return LOW; };
+inline void pinMode(uint8_t pin, uint8_t mode) {};
+inline uint8_t digitalRead(uint8_t pin) { return LOW; };
 
 #define USB1_PORTSC1 0
 
-uint32_t random(uint32_t howbig)
+inline uint32_t random(uint32_t howbig)
 {
     if (howbig == 0)
         return 0;

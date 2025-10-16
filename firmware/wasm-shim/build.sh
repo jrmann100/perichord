@@ -9,6 +9,8 @@ fi
 mkdir -p dist
 
 SOURCES="
+shim/Audio/*.cpp
+shim/AudioStream.cpp
 shim/Arduino.cpp
 ../lib/Hx_plateReverb/effect_platervbstereo.cpp
 ../src/main.cpp
