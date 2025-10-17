@@ -73,7 +73,7 @@
 // #include "output_adat.h"
 // #include "output_dac.h"
 // #include "output_dacs.h"
-// #include "output_i2s.h"
+#include "output_i2s.h"
 // #include "output_i2s2.h"
 // #include "output_i2s_hex.h"
 // #include "output_i2s_oct.h"
@@ -103,24 +103,6 @@
 #include "synth_waveform.h"
 // #include "synth_wavetable.h"
 #include "synth_whitenoise.h"
-
-// NOTE: This project uses only a small subset of the full PJRC
-// Audio Library. A trimmed list of required vs unused Audio shim
-// files is maintained in
-//   wasm-shim/shim/Audio/UNUSED_FILES.md
-// Files that are not reachable from the headers included here
-// are candidates for removal to shrink the WASM shim. See that
-// document before deleting files.
-
-class AudioOutputI2S : public AudioStream
-{
-public:
-    AudioOutputI2S() : AudioStream(2, inputQueueArray) {}
-    virtual void update(void) {}
-
-private:
-    audio_block_t *inputQueueArray[2];
-};
 
 class AudioInputI2S : public AudioStream
 {

@@ -10,6 +10,8 @@ AudioStream *AudioStream::first_update = NULL;
 audio_block_t *AudioStream::memory_pool = NULL;
 uint32_t AudioStream::memory_pool_available_mask[] = {};
 uint16_t AudioStream::memory_pool_first_mask = 0;
+uint16_t AudioStream::memory_pool_size = 0;
+AudioConnection *AudioStream::first_connection = NULL;
 
 AudioConnection::AudioConnection()
     : src(nullptr),
@@ -43,14 +45,20 @@ int AudioConnection::connect(void)
 int AudioConnection::connect(AudioStream &source, unsigned char sourceOutput,
                              AudioStream &destination, unsigned char destinationInput)
 {
-    // In the firmware this records routing information for the audio graph so
-    // audio blocks flow between objects. We only remember the pointers and
-    // mark the connection as active.
+    // Store the routing information
     src = &source;
     dst = &destination;
     src_index = sourceOutput;
     dest_index = destinationInput;
-    next_dest = nullptr;
+
+    // Add to global connection list
+    next_dest = AudioStream::first_connection;
+    AudioStream::first_connection = this;
+
+    // Mark both source and destination as active
+    source.active = true;
+    destination.active = true;
+
     return connect();
 }
 
@@ -69,55 +77,113 @@ int AudioConnection::disconnect(void)
 
 void AudioStream::initialize_memory(audio_block_t *data, unsigned int num)
 {
-    // The Teensy core hands a statically allocated pool to the audio engine
-    // here so that allocate()/release() can hand out buffers. The shim does not
-    // process real audio, but we keep track of the pointer for completeness so
-    // diagnostics that inspect the pool do not crash.
+    // Store the memory pool and size
     memory_pool = data;
-    (void)num; // pool size is unused in the shim implementation.
+    memory_pool_size = num;
     memory_used = 0;
     memory_used_max = 0;
+
+    // Initialize all blocks as available
+    for (unsigned int i = 0; i < num; i++)
+    {
+        data[i].ref_count = 0;
+        data[i].memory_pool_index = i;
+    }
 }
 
 audio_block_t *AudioStream::allocate(void)
 {
-    // Real firmware would pop a buffer from the shared pool. Returning nullptr
-    // keeps the shim lightweight while allowing code that checks for failed
-    // allocations to continue.
+    // Find a free block in the pool
+    if (memory_pool == nullptr || memory_pool_size == 0)
+        return nullptr;
+
+    for (uint16_t i = 0; i < memory_pool_size; i++)
+    {
+        if (memory_pool[i].ref_count == 0)
+        {
+            memory_pool[i].ref_count = 1;
+            memory_used++;
+            if (memory_used > memory_used_max)
+                memory_used_max = memory_used;
+            return &memory_pool[i];
+        }
+    }
+
     return nullptr;
 }
 
 void AudioStream::release(const audio_block_t *block)
 {
-    // On-device this decrements the reference count and returns the block to
-    // the pool. Nothing was allocated in the shim, so there is nothing to do.
-    (void)block;
+    // Decrement reference count and return to pool
+    if (block != nullptr)
+    {
+        audio_block_t *b = const_cast<audio_block_t *>(block);
+        if (b->ref_count > 0)
+        {
+            b->ref_count--;
+            if (b->ref_count == 0)
+            {
+                memory_used--;
+            }
+        }
+    }
 }
 
 void AudioStream::transmit(audio_block_t *block, unsigned char index)
 {
-    // The firmware pushes the audio block to every downstream connection. The
-    // shim performs no routing, but clearing the ref count mirrors the release
-    // that normally happens after transmission.
-    (void)index;
-    if (block != nullptr)
+    // Push the audio block to all downstream connections
+    if (block == nullptr)
+        return;
+
+    AudioConnection *conn = AudioStream::first_connection;
+    while (conn)
     {
-        block->ref_count = 0;
+        if (conn->src == this && conn->src_index == index && conn->isConnected)
+        {
+            // Route this block to the destination's input queue
+            if (conn->dst && conn->dest_index < conn->dst->num_inputs)
+            {
+                // Store in the destination's input queue
+                if (conn->dst->inputQueue)
+                {
+                    conn->dst->inputQueue[conn->dest_index] = block;
+                    block->ref_count++; // Increment for this destination
+                }
+            }
+        }
+        conn = conn->next_dest;
     }
 }
 
 audio_block_t *AudioStream::receiveReadOnly(unsigned int index)
 {
-    // Hardware nodes pull from their input queues here. We do not generate
-    // audio in the shim, so we always report that no block is available.
-    (void)index;
+    // Pull from input queue
+    if (index < num_inputs && inputQueue != nullptr)
+    {
+        return inputQueue[index];
+    }
     return nullptr;
 }
 
 audio_block_t *AudioStream::receiveWritable(unsigned int index)
 {
-    // Writable access requests a unique buffer; the shim has no audio data, so
-    // we mirror the read-only stub and return nullptr.
-    (void)index;
-    return nullptr;
+    // For writable access, we need a unique copy
+    // For now, just return the same as readonly
+    return receiveReadOnly(index);
+}
+
+void AudioStream::update_all(void)
+{
+    // Walk through the linked list of all AudioStream objects and call update()
+    // on each one. This simulates the Teensy Audio library's interrupt-driven
+    // update cycle in a synchronous manner for the web worklet.
+    AudioStream *p = first_update;
+    while (p)
+    {
+        if (p->active)
+        {
+            p->update();
+        }
+        p = p->next_update;
+    }
 }

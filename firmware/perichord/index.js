@@ -3,6 +3,9 @@ powerButton.disabled = true;
 
 const perichord = await (await import("./dist/perichord.js")).default();
 const worklet = new perichord.PerichordAudioWorklet(() => {
+  // Setup the Teensy Audio library components
+  worklet.setup();
+
   powerButton.disabled = false;
   document.getElementById("power").addEventListener("click", async () => {
     await worklet.resume();

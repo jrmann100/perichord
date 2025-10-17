@@ -143,7 +143,11 @@ protected:
     audio_block_t *receiveWritable(unsigned int index = 0);
     static bool update_setup(void);
     static void update_stop(void);
+
+public:
     static void update_all(void);
+
+protected:
     friend void software_isr(void);
     friend class AudioConnection;
 #if defined(AUDIO_DEBUG_CLASS)
@@ -162,6 +166,8 @@ private:
     static audio_block_t *memory_pool;
     static uint32_t memory_pool_available_mask[];
     static uint16_t memory_pool_first_mask;
+    static uint16_t memory_pool_size;
+    static AudioConnection *first_connection;
 };
 
 #if defined(AUDIO_DEBUG_CLASS)
