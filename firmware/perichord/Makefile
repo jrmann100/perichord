@@ -26,6 +26,7 @@ C_SOURCES := shim/Audio/data_waveforms.c \
     shim/Audio/data_bandlimit_step.c
 
 C_OBJECTS := $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+CXX_OBJECTS := $(addprefix $(BUILD_DIR)/,$(notdir $(SOURCES:.cpp=.o)))
 
 INCLUDES := -I shim \
     -I ../include \
@@ -38,8 +39,10 @@ INCLUDES := -I shim \
 
 DEFINES := -DKINETISL -DTEENSYDUINO=120
 
-CFLAGS := -O2 -pthread $(INCLUDES) $(DEFINES)
-CXXFLAGS := -O2 -std=c++17 -pthread $(INCLUDES) $(DEFINES)
+# Use -O0 for faster dev builds, -O2 for production
+OPT_LEVEL := -O2
+CFLAGS := $(OPT_LEVEL) -pthread $(INCLUDES) $(DEFINES)
+CXXFLAGS := $(OPT_LEVEL) -std=c++17 -pthread $(INCLUDES) $(DEFINES)
 EMCC_LINK_FLAGS := -s WASM=1 \
     -s MODULARIZE=1 \
     -s EXPORT_NAME='createPerichord' \
@@ -61,15 +64,36 @@ EMCC_LINK_FLAGS := -s WASM=1 \
     -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
     --bind
 
-.PHONY: all clean
+.PHONY: all clean watch
 
 all: $(OUTPUT)
 
-$(OUTPUT): $(SOURCES) $(C_OBJECTS) | $(DIST_DIR)
-	$(EMCC) $(CXXFLAGS) $(EMCC_LINK_FLAGS) $(SOURCES) $(C_OBJECTS) -o $@
+# Link all object files together
+$(OUTPUT): $(CXX_OBJECTS) $(C_OBJECTS) | $(DIST_DIR)
+	@echo "Linking $@..."
+	$(EMCC) $(EMCC_LINK_FLAGS) $^ -o $@
 
+# Compile C sources
 $(BUILD_DIR)/%.o: shim/Audio/%.c | $(BUILD_DIR)
+	@echo "Compiling $<..."
 	$(EMCC) $(CFLAGS) -c $< -o $@
+
+# Compile C++ sources from various directories
+$(BUILD_DIR)/%.o: shim/Audio/%.cpp | $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EMCC) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: shim/%.cpp | $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EMCC) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EMCC) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: ../lib/Hx_plateReverb/%.cpp | $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EMCC) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -79,3 +103,8 @@ $(DIST_DIR):
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
+
+# Watch mode for auto-rebuild on file changes
+# Usage: make watch
+watch:
+	bunx chokidar-cli "**/*.cpp" "**/*.c" "**/*.h" -c "make"

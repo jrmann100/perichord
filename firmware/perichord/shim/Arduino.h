@@ -6,6 +6,7 @@
 #include <cstring>
 #include <emscripten.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string>
 #include <time.h>
 
@@ -120,15 +121,42 @@ typedef uint8_t byte;
 typedef unsigned long elapsedMillis;
 typedef unsigned long elapsedMicros;
 
+#include <cstdarg>
+
 class SerialShim
 {
 public:
-    void println(const char *) {}
-    void println(unsigned char) {}
-    void print(const char *) {}
-    void print(int) {}
     void begin(unsigned long) {}
-    void printf(const char *format, ...) {}
+
+    void println() { printf("\n"); }
+
+    void println(const char *s)
+    {
+        if (s)
+            printf("%s\n", s);
+        else
+            printf("\n");
+    }
+
+    void println(int v) { printf("%d\n", v); }
+    void println(unsigned int v) { printf("%u\n", v); }
+
+    void print(const char *s)
+    {
+        if (s)
+            fputs(s, stdout);
+    }
+
+    void print(int v) { printf("%d", v); }
+    void print(unsigned int v) { printf("%u", v); }
+
+    void printf(const char *format, ...)
+    {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
 };
 
 static SerialShim Serial;

@@ -9,4 +9,5 @@ module.exports = {
       next();
     },
   ],
+  watch: ["index.js", "index.html", "dist"],
 };
