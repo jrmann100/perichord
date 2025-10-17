@@ -8,7 +8,7 @@ endif
 
 DIST_DIR := dist
 BUILD_DIR := build
-OUTPUT := $(DIST_DIR)/minichord.js
+OUTPUT := $(DIST_DIR)/perichord.js
 
 AUDIO_SOURCES := $(wildcard shim/Audio/*.cpp)
 SOURCES := $(AUDIO_SOURCES) \
@@ -20,7 +20,7 @@ SOURCES := $(AUDIO_SOURCES) \
     shim/MPR121.cpp \
     shim/potentiometer.cpp \
     ../lib/Hx_plateReverb/effect_platervbstereo.cpp \
-    ../src/main.cpp
+    perichord.cpp
 
 C_SOURCES := shim/Audio/data_waveforms.c \
     shim/Audio/data_bandlimit_step.c
@@ -38,19 +38,26 @@ INCLUDES := -I shim \
 
 DEFINES := -DKINETISL -DTEENSYDUINO=120
 
-CFLAGS := -O2 $(INCLUDES) $(DEFINES)
-CXXFLAGS := -O2 -std=c++17 $(INCLUDES) $(DEFINES)
+CFLAGS := -O2 -pthread $(INCLUDES) $(DEFINES)
+CXXFLAGS := -O2 -std=c++17 -pthread $(INCLUDES) $(DEFINES)
 EMCC_LINK_FLAGS := -s WASM=1 \
     -s MODULARIZE=1 \
-    -s EXPORT_NAME='MinichordModule' \
+    -s EXPORT_NAME='createPerichord' \
+    -s EXPORTED_RUNTIME_METHODS=['addFunction','emscriptenRegisterAudioObject','emscriptenGetAudioObject'] \
     -s ALLOW_MEMORY_GROWTH=1 \
-    -s INITIAL_MEMORY=64MB \
-    -s MAXIMUM_MEMORY=512MB \
-    -s STACK_SIZE=16MB \
+    -s INITIAL_MEMORY=8MB \
+    -s MAXIMUM_MEMORY=16MB \
+    -s STACK_SIZE=64KB \
     -s NO_FILESYSTEM=1 \
     -s ENVIRONMENT=web \
     -s MALLOC=emmalloc \
     -s ASSERTIONS=0 \
+    -s ALLOW_TABLE_GROWTH=1 \
+    -s AUDIO_WORKLET=2 \
+    -s WASM_WORKERS=1 \
+    -pthread \
+    -s ENVIRONMENT=web \
+    -s EXPORT_ES6=1 \
     -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
     --bind
 
