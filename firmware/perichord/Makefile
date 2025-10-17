@@ -53,7 +53,7 @@ EMCC_LINK_FLAGS := -s WASM=1 \
     -s MALLOC=emmalloc \
     -s ASSERTIONS=0 \
     -s ALLOW_TABLE_GROWTH=1 \
-    -s AUDIO_WORKLET=2 \
+    -s AUDIO_WORKLET=1 \
     -s WASM_WORKERS=1 \
     -pthread \
     -s ENVIRONMENT=web \
