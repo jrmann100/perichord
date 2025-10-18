@@ -4,6 +4,10 @@
 #include <emscripten/em_math.h>
 #include <emscripten/webaudio.h>
 
+extern AudioOutputI2S DAC_out;
+extern void setup();
+extern void loop();
+
 // Global pointer to the output for the audio callback
 static AudioOutputI2S *g_audioOutput = nullptr;
 
@@ -16,10 +20,10 @@ bool GenerateAudioFromTeensy(int numInputs, const AudioSampleFrame *inputs,
     AudioStream::update_all();
 
     // Get the rendered audio from the I2S output
-    if (g_audioOutput && numOutputs > 0)
+    if (numOutputs > 0)
     {
-        const int16_t *leftChannel = g_audioOutput->getLeftChannel();
-        const int16_t *rightChannel = g_audioOutput->getRightChannel();
+        const int16_t *leftChannel = DAC_out.getLeftChannel();
+        const int16_t *rightChannel = DAC_out.getRightChannel();
 
         // Convert int16_t samples to float samples expected by WebAudio
         // WebAudio expects samples in range [-1.0, 1.0]
@@ -82,7 +86,10 @@ void PerichordAudioWorklet::onAudioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T
     // Connect it to audio context destination
     emscripten_audio_node_connect(wasmAudioWorklet, audioContext, 0, 0);
 
-    // Call the ready callback - we're already on the main thread!
+    printf("Setting up Teensy Audio Library components...\n");
+
+    setup();
+
     if (self->readyCallback.as<bool>())
     {
         self->readyCallback();
@@ -95,27 +102,6 @@ PerichordAudioWorklet::PerichordAudioWorklet(emscripten::val readyCallback)
     audioContext = emscripten_create_audio_context(0);
     emscripten_start_wasm_audio_worklet_thread_async(audioContext, audioThreadStack, sizeof(audioThreadStack),
                                                      &onAudioThreadInitialized, this);
-}
-
-void PerichordAudioWorklet::setup()
-{
-    // Allocate audio memory for Teensy Audio library
-    static audio_block_t audioMemory[10];
-    AudioStream::initialize_memory(audioMemory, 10);
-
-    // Create the audio components (like in test.cpp)
-    noise1 = new AudioSynthNoiseWhite();
-    i2s1 = new AudioOutputI2S();
-
-    // Connect white noise to both left and right channels
-    patchCord1 = new AudioConnection(*noise1, 0, *i2s1, 0);
-    patchCord2 = new AudioConnection(*noise1, 0, *i2s1, 1);
-
-    // Set amplitude (0.0 to 1.0)
-    noise1->amplitude(0.5);
-
-    // Store the output globally for the audio callback
-    g_audioOutput = i2s1;
 }
 
 bool PerichordAudioWorklet::resume()

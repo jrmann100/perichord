@@ -139,7 +139,6 @@ public:
     }
 
     void println(int v) { printf("%d\n", v); }
-    void println(unsigned int v) { printf("%u\n", v); }
 
     void print(const char *s)
     {

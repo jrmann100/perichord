@@ -13,7 +13,6 @@ class PerichordAudioWorklet
 public:
     PerichordAudioWorklet(emscripten::val readyCallback);
     bool resume();
-    void setup();
     EMSCRIPTEN_WEBAUDIO_T audioContext;
 
 private:
@@ -34,7 +33,6 @@ EMSCRIPTEN_BINDINGS(perichord_bindings)
 {
     emscripten::class_<PerichordAudioWorklet>("PerichordAudioWorklet")
         .constructor<emscripten::val>()
-        .function("setup", &PerichordAudioWorklet::setup)
         .function("resume", &PerichordAudioWorklet::resume)
         .property("audioContext", &PerichordAudioWorklet::audioContext);
 }
