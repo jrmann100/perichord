@@ -21,8 +21,8 @@ debouncer chord_matrix_array[22];
 harp harp_sensor;
 button_matrix chord_matrix(SHIFT_DATA_PIN, SHIFT_STORAGE_CLOCK_PIN, SHIFT_CLOCK_PIN, READ_MATRIX_1_PIN, READ_MATRIX_2_PIN, READ_MATRIX_3_PIN);
 debouncer hold_button;
-// debouncer up_button;
-// debouncer down_button;
+debouncer up_button;
+debouncer down_button;
 debouncer LBO_flag;
 bool flag_save_needed = false; // to know if we need to save the preset
 potentiometer chord_pot(POT_CHORD_PIN);
@@ -825,47 +825,47 @@ String serialize(int16_t data_array[], u_int16_t array_size)
 //   }
 // }
 
-// void save_config(int bank_number, bool default_save)
-// {
-//   if (bank_number < 0 || bank_number >= preset_number)
-//   {
-//     Serial.printf("Error: Invalid bank_number %d in save_config\n", bank_number);
-//     return;
-//   }
-//   digitalWrite(_MUTE_PIN, LOW);      // muting the DAC
-//   current_bank_number = bank_number; // save to correctly write in the memory
-//   AudioNoInterrupts();
-//   // myfs.quickFormat();  // performs a quick format of the created di
-//   myfs.remove(bank_name[bank_number]);
-//   File dataFile = myfs.open(bank_name[bank_number], FILE_WRITE);
+void save_config(int bank_number, bool default_save)
+{
+  //   if (bank_number < 0 || bank_number >= preset_number)
+  //   {
+  //     Serial.printf("Error: Invalid bank_number %d in save_config\n", bank_number);
+  //     return;
+  //   }
+  //   digitalWrite(_MUTE_PIN, LOW);      // muting the DAC
+  //   current_bank_number = bank_number; // save to correctly write in the memory
+  //   AudioNoInterrupts();
+  //   // myfs.quickFormat();  // performs a quick format of the created di
+  //   myfs.remove(bank_name[bank_number]);
+  //   File dataFile = myfs.open(bank_name[bank_number], FILE_WRITE);
 
-//   if (default_save)
-//   {
-//     // if we need to put the default in memory
-//     Serial.println("Writing the default file");
-//     Serial.println(bank_name[bank_number]);
-//     String return_data = serialize(default_bank_sysex_parameters[bank_number], parameter_size);
-//     dataFile.println(return_data);
-//   }
-//   else
-//   {
-//     Serial.println("Saving current settings");
-//     for (u_int16_t i = 0; i < parameter_size; i++)
-//     {
-//       Serial.println(current_sysex_parameters[i]);
-//     }
-//     dataFile.println(serialize(current_sysex_parameters, parameter_size));
-//   }
-//   Serial.print("Saved preset: ");
-//   Serial.println(dataFile.name());
-//   dataFile.close();
+  //   if (default_save)
+  //   {
+  //     // if we need to put the default in memory
+  //     Serial.println("Writing the default file");
+  //     Serial.println(bank_name[bank_number]);
+  //     String return_data = serialize(default_bank_sysex_parameters[bank_number], parameter_size);
+  //     dataFile.println(return_data);
+  //   }
+  //   else
+  //   {
+  //     Serial.println("Saving current settings");
+  //     for (u_int16_t i = 0; i < parameter_size; i++)
+  //     {
+  //       Serial.println(current_sysex_parameters[i]);
+  //     }
+  //     dataFile.println(serialize(current_sysex_parameters, parameter_size));
+  //   }
+  //   Serial.print("Saved preset: ");
+  //   Serial.println(dataFile.name());
+  //   dataFile.close();
 
-//   load_config(current_bank_number); // we do a full reload to initialise values
+  //   load_config(current_bank_number); // we do a full reload to initialise values
 
-//   // add something to set config_bit in the parameters to zero
-//   AudioInterrupts();
-//   digitalWrite(_MUTE_PIN, HIGH); // unmuting the DAC
-// }
+  //   // add something to set config_bit in the parameters to zero
+  //   AudioInterrupts();
+  //   digitalWrite(_MUTE_PIN, HIGH); // unmuting the DAC
+}
 
 void load_config(int bank_number)
 {
@@ -980,8 +980,8 @@ void setup()
   harp_sensor.setup();
   harp_sensor.recalibrate();
   // pinMode(BATT_LBO_PIN, INPUT);
-  // pinMode(DOWN_PGM_PIN, INPUT);
-  // pinMode(UP_PGM_PIN, INPUT);
+  pinMode(DOWN_PGM_PIN, INPUT);
+  pinMode(UP_PGM_PIN, INPUT);
   pinMode(HOLD_BUTTON_PIN, INPUT);
   if (continuous_chord)
   {
@@ -1303,33 +1303,33 @@ void handle_hold_button()
   }
 }
 
-// void handle_preset_change()
-// {
-//   if (up_button.read_transition() > 1)
-//   {
-//     Serial.println("Switching to next preset");
-//     if (!sysex_controler_connected && flag_save_needed)
-//     {
-//       save_config(current_bank_number, false);
-//     }
-//     current_bank_number = (current_bank_number + 1) % 12;
-//     load_config(current_bank_number);
-//   }
-//   if (down_button.read_transition() > 1)
-//   {
-//     Serial.println("Switching to last preset");
-//     if (!sysex_controler_connected && flag_save_needed)
-//     {
-//       save_config(current_bank_number, false);
-//     }
-//     current_bank_number = (current_bank_number - 1);
-//     if (current_bank_number == -1)
-//     {
-//       current_bank_number = 11;
-//     }
-//     load_config(current_bank_number);
-//   }
-// }
+void handle_preset_change()
+{
+  if (up_button.read_transition() > 1)
+  {
+    Serial.println("Switching to next preset");
+    if (!sysex_controler_connected && flag_save_needed)
+    {
+      save_config(current_bank_number, false);
+    }
+    current_bank_number = (current_bank_number + 1) % 12;
+    load_config(current_bank_number);
+  }
+  if (down_button.read_transition() > 1)
+  {
+    Serial.println("Switching to last preset");
+    if (!sysex_controler_connected && flag_save_needed)
+    {
+      save_config(current_bank_number, false);
+    }
+    current_bank_number = (current_bank_number - 1);
+    if (current_bank_number == -1)
+    {
+      current_bank_number = 11;
+    }
+    load_config(current_bank_number);
+  }
+}
 
 // void handle_low_battery()
 // {
@@ -1388,9 +1388,9 @@ void loop()
 
   // Update debouncers
   hold_button.set(digitalRead(HOLD_BUTTON_PIN));
-  // up_button.set(digitalRead(UP_PGM_PIN));
-  // down_button.set(digitalRead(DOWN_PGM_PIN));
-  LBO_flag.set(digitalRead(BATT_LBO_PIN));
+  up_button.set(digitalRead(UP_PGM_PIN));
+  down_button.set(digitalRead(DOWN_PGM_PIN));
+  // LBO_flag.set(digitalRead(BATT_LBO_PIN));
   chord_matrix.update(chord_matrix_array);
 
   // Handle low battery indicator
@@ -1400,7 +1400,7 @@ void loop()
   handle_hold_button();
 
   // Handle preset changes
-  // handle_preset_change();
+  handle_preset_change();
 
   // Handle rhythm mode note-off timing
   if (rythm_mode)

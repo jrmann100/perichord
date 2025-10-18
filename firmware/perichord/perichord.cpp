@@ -94,11 +94,23 @@ void PerichordAudioWorklet::onAudioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T
     {
         self->readyCallback();
     }
+
+    emscripten_set_main_loop(loop, 0, false);
 }
 
 PerichordAudioWorklet::PerichordAudioWorklet(emscripten::val readyCallback)
     : readyCallback(readyCallback), noise1(nullptr), i2s1(nullptr), patchCord1(nullptr), patchCord2(nullptr)
 {
+
+    EM_ASM({
+        // clang-format off
+        Module._eventTarget = new EventTarget();
+        Module.addEventListener = (... args) => Module._eventTarget.addEventListener(... args);
+        Module.removeEventListener = (... args) => Module._eventTarget.removeEventListener(... args);
+        Module.dispatchEvent = (... args) => Module._eventTarget.dispatchEvent(... args);
+        // clang-format on
+    });
+
     audioContext = emscripten_create_audio_context(0);
     emscripten_start_wasm_audio_worklet_thread_async(audioContext, audioThreadStack, sizeof(audioThreadStack),
                                                      &onAudioThreadInitialized, this);

@@ -40,17 +40,16 @@ INCLUDES := -I shim \
 
 DEFINES := -DKINETISL -DTEENSYDUINO=120
 
-# Use -O0 for faster dev builds, -O2 for production
-OPT_LEVEL := -O2
+OPT_LEVEL := -O3
 CFLAGS := $(OPT_LEVEL) -pthread $(INCLUDES) $(DEFINES) -MMD -MP
 CXXFLAGS := $(OPT_LEVEL) -std=c++17 -pthread $(INCLUDES) $(DEFINES) -MMD -MP
 EMCC_LINK_FLAGS := -s WASM=1 \
 	-s MODULARIZE=1 \
 	-s EXPORT_NAME='createPerichord' \
-	-s EXPORTED_RUNTIME_METHODS=['addFunction','emscriptenRegisterAudioObject','emscriptenGetAudioObject'] \
+	-s EXPORTED_RUNTIME_METHODS=['addFunction','emscriptenRegisterAudioObject','emscriptenGetAudioObject','wasmMemory'] \
 	-s ALLOW_MEMORY_GROWTH=1 \
-	-s INITIAL_MEMORY=8MB \
 	-s MAXIMUM_MEMORY=16MB \
+	-s INITIAL_MEMORY=8MB \
 	-s STACK_SIZE=64KB \
 	-s NO_FILESYSTEM=1 \
 	-s ENVIRONMENT=web \
