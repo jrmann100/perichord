@@ -20,7 +20,8 @@ SOURCES := $(AUDIO_SOURCES) \
     shim/MPR121.cpp \
     shim/potentiometer.cpp \
     ../lib/Hx_plateReverb/effect_platervbstereo.cpp \
-    perichord.cpp
+    perichord.cpp \
+    ../src/main.cpp
 
 C_SOURCES := shim/Audio/data_waveforms.c \
     shim/Audio/data_bandlimit_step.c
@@ -92,6 +93,10 @@ $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	$(EMCC) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: ../lib/Hx_plateReverb/%.cpp | $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EMCC) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: ../src/%.cpp | $(BUILD_DIR)
 	@echo "Compiling $<..."
 	$(EMCC) $(CXXFLAGS) -c $< -o $@
 
