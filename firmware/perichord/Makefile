@@ -12,58 +12,58 @@ OUTPUT := $(DIST_DIR)/perichord.js
 
 AUDIO_SOURCES := $(wildcard shim/Audio/*.cpp)
 SOURCES := $(AUDIO_SOURCES) \
-    shim/AudioStream.cpp \
-    shim/Arduino.cpp \
-    shim/button_matrix.cpp \
-    shim/debouncer.cpp \
-    shim/harp.cpp \
-    shim/MPR121.cpp \
-    shim/potentiometer.cpp \
-    ../lib/Hx_plateReverb/effect_platervbstereo.cpp \
-    perichord.cpp \
-    ../src/main.cpp
+	shim/AudioStream.cpp \
+	shim/Arduino.cpp \
+	shim/button_matrix.cpp \
+	shim/debouncer.cpp \
+	shim/harp.cpp \
+	shim/MPR121.cpp \
+	shim/potentiometer.cpp \
+	../lib/Hx_plateReverb/effect_platervbstereo.cpp \
+	perichord.cpp \
+	../src/main.cpp
 
 C_SOURCES := shim/Audio/data_waveforms.c \
-    shim/Audio/data_bandlimit_step.c
+	shim/Audio/data_bandlimit_step.c
 
 C_OBJECTS := $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 CXX_OBJECTS := $(addprefix $(BUILD_DIR)/,$(notdir $(SOURCES:.cpp=.o)))
 
 INCLUDES := -I shim \
-    -I ../include \
-    -I ../lib/button_matrix/src \
-    -I ../lib/debouncer/src \
-    -I ../lib/harp/src \
-    -I ../lib/potentiometer/src \
-    -I ../lib/Hx_plateReverb \
-    -I shim/Audio
+	-I ../include \
+	-I ../lib/button_matrix/src \
+	-I ../lib/debouncer/src \
+	-I ../lib/harp/src \
+	-I ../lib/potentiometer/src \
+	-I ../lib/Hx_plateReverb \
+	-I shim/Audio
 
 DEFINES := -DKINETISL -DTEENSYDUINO=120
 
 # Use -O0 for faster dev builds, -O2 for production
 OPT_LEVEL := -O2
-CFLAGS := $(OPT_LEVEL) -pthread $(INCLUDES) $(DEFINES)
-CXXFLAGS := $(OPT_LEVEL) -std=c++17 -pthread $(INCLUDES) $(DEFINES)
+CFLAGS := $(OPT_LEVEL) -pthread $(INCLUDES) $(DEFINES) -MMD -MP
+CXXFLAGS := $(OPT_LEVEL) -std=c++17 -pthread $(INCLUDES) $(DEFINES) -MMD -MP
 EMCC_LINK_FLAGS := -s WASM=1 \
-    -s MODULARIZE=1 \
-    -s EXPORT_NAME='createPerichord' \
-    -s EXPORTED_RUNTIME_METHODS=['addFunction','emscriptenRegisterAudioObject','emscriptenGetAudioObject'] \
-    -s ALLOW_MEMORY_GROWTH=1 \
-    -s INITIAL_MEMORY=8MB \
-    -s MAXIMUM_MEMORY=16MB \
-    -s STACK_SIZE=64KB \
-    -s NO_FILESYSTEM=1 \
-    -s ENVIRONMENT=web \
-    -s MALLOC=emmalloc \
-    -s ASSERTIONS=0 \
-    -s ALLOW_TABLE_GROWTH=1 \
-    -s AUDIO_WORKLET=1 \
-    -s WASM_WORKERS=1 \
-    -pthread \
-    -s ENVIRONMENT=web \
-    -s EXPORT_ES6=1 \
-    -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
-    --bind
+	-s MODULARIZE=1 \
+	-s EXPORT_NAME='createPerichord' \
+	-s EXPORTED_RUNTIME_METHODS=['addFunction','emscriptenRegisterAudioObject','emscriptenGetAudioObject'] \
+	-s ALLOW_MEMORY_GROWTH=1 \
+	-s INITIAL_MEMORY=8MB \
+	-s MAXIMUM_MEMORY=16MB \
+	-s STACK_SIZE=64KB \
+	-s NO_FILESYSTEM=1 \
+	-s ENVIRONMENT=web \
+	-s MALLOC=emmalloc \
+	-s ASSERTIONS=0 \
+	-s ALLOW_TABLE_GROWTH=1 \
+	-s AUDIO_WORKLET=1 \
+	-s WASM_WORKERS=1 \
+	-pthread \
+	-s ENVIRONMENT=web \
+	-s EXPORT_ES6=1 \
+	-s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+	--bind
 
 .PHONY: all clean watch
 
@@ -112,4 +112,10 @@ clean:
 # Watch mode for auto-rebuild on file changes
 # Usage: make watch
 watch:
-	bunx chokidar-cli "**/*.cpp" "**/*.c" "**/*.h" -c "make"
+	bunx chokidar-cli "../**/*.cpp" "../**/*.c" "../**/*.h" -c "make"
+
+dev:
+	bunx five-server
+
+# Include auto-generated dependency files
+-include $(CXX_OBJECTS:.o=.d) $(C_OBJECTS:.o=.d)
