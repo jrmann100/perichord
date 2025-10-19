@@ -795,19 +795,19 @@ void recalculate_timer()
   short_timer_period = 2 * (60 * 1000 * 1000) / (2 * rythm_bpm) - long_timer_period;
 }
 
-//--->>FILE HANDLING UTILITIES
-String serialize(int16_t data_array[], u_int16_t array_size)
-{
-  String dataString = "0,";
-  dataString += String(current_bank_number); // to save the number of the bank for the online display
-  dataString += ",";
-  for (u_int16_t i = 2; i < array_size; i++)
-  {
-    dataString += String(data_array[i]);
-    dataString += ",";
-  }
-  return dataString;
-}
+// //--->>FILE HANDLING UTILITIES
+// String serialize(int16_t data_array[], u_int16_t array_size)
+// {
+//   String dataString = "0,";
+//   dataString += String(current_bank_number); // to save the number of the bank for the online display
+//   dataString += ",";
+//   for (u_int16_t i = 2; i < array_size; i++)
+//   {
+//     dataString += String(data_array[i]);
+//     dataString += ",";
+//   }
+//   return dataString;
+// }
 
 // void deserialize(String input, int16_t data_array[])
 // {
@@ -1013,6 +1013,7 @@ void setup()
   // }
 
   Serial.println("Initialisation complete");
+  // TODO: this is not shimmed yet
   digitalWrite(_MUTE_PIN, HIGH);
 }
 

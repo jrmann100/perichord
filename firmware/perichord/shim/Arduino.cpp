@@ -2,11 +2,9 @@
 #include "def.h"
 #include <map>
 
-extern "C"
+void analogWrite(uint8_t pin, uint8_t value)
 {
-    EM_JS(void, analogWrite, (uint8_t pin, uint8_t value), {
-        Module.dispatchEvent(new CustomEvent('analogwrite', {detail : {pin : pin, value : value}}));
-    });
+    EM_ASM_({ Module.dispatchEvent(new CustomEvent('analogwrite', {detail : {pin : $0, value : $1}})); }, pin, value);
 }
 
 void digitalWrite(uint8_t pin, uint8_t value)

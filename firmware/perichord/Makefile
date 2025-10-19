@@ -14,11 +14,11 @@ AUDIO_SOURCES := $(wildcard shim/Audio/*.cpp)
 SOURCES := $(AUDIO_SOURCES) \
 	shim/AudioStream.cpp \
 	shim/Arduino.cpp \
-	shim/button_matrix.cpp \
 	shim/debouncer.cpp \
 	shim/harp.cpp \
 	shim/MPR121.cpp \
 	shim/potentiometer.cpp \
+	shim/button_matrix.cpp \
 	../lib/Hx_plateReverb/effect_platervbstereo.cpp \
 	perichord.cpp \
 	../src/main.cpp
@@ -31,7 +31,6 @@ CXX_OBJECTS := $(addprefix $(BUILD_DIR)/,$(notdir $(SOURCES:.cpp=.o)))
 
 INCLUDES := -I shim \
 	-I ../include \
-	-I ../lib/button_matrix/src \
 	-I ../lib/debouncer/src \
 	-I ../lib/harp/src \
 	-I ../lib/potentiometer/src \
@@ -61,7 +60,6 @@ EMCC_LINK_FLAGS := -s WASM=1 \
 	-pthread \
 	-s ENVIRONMENT=web \
 	-s EXPORT_ES6=1 \
-	-s ERROR_ON_UNDEFINED_SYMBOLS=0 \
 	--bind
 
 .PHONY: all clean watch

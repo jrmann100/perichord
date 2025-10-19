@@ -17,6 +17,7 @@
 //
 // #define AudioNoInterrupts() (NVIC_DISABLE_IRQ(IRQ_SOFTWARE))
 // #define AudioInterrupts() (NVIC_ENABLE_IRQ(IRQ_SOFTWARE))
+// TODO: not sure how to implement this in emscripten. is it just as simple as pausing the audio loop?
 #define AudioNoInterrupts() ((void)0)
 #define AudioInterrupts() ((void)0)
 

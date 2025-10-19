@@ -1,7 +1,19 @@
 .led {
-    border: 1px solid black;
-    border-radius: 100%;
-    width: 2rem;
-    height: 2rem;
-    background-color: black;
+  border: 1px solid black;
+  border-radius: 100%;
+  width: 2rem;
+  height: 2rem;
+  background-color: black;
+}
+
+#rgb-led,
+#rhythm-led {
+  fill: black;
+}
+
+:is(#up-pgm-button, #down-pgm-button, #hold-button, .chord-matrix-button):not(
+    [aria-disabled="true"]
+  ) {
+  fill: lightgray;
+  cursor: pointer;
 }
