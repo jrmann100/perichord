@@ -14,18 +14,18 @@ void digitalWrite(uint8_t pin, uint8_t value)
     // TODO
 }
 
-std::map<uint8_t, uint8_t> pinMap;
+uint8_t pinValues[34];
 
 void pinMode(uint8_t pin, uint8_t mode)
 {
     if (mode == INPUT)
     {
-        pinMap[pin] = LOW;
-        EM_ASM_({ Module.dispatchEvent(new CustomEvent('pinmode', {detail : {pin : $0, mode : $1, ptr : $2}})); }, pin, mode, &pinMap[pin]);
+        pinValues[pin] = LOW;
+        EM_ASM_({ Module.dispatchEvent(new CustomEvent('pinmode', {detail : {pin : $0, mode : $1, ptr : $2}})); }, pin, mode, &pinValues[pin]);
     }
 }
 
 uint8_t digitalRead(uint8_t pin)
 {
-    return pinMap[pin];
+    return pinValues[pin];
 }
