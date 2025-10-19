@@ -12,7 +12,6 @@ class PerichordAudioWorklet
 {
 public:
     PerichordAudioWorklet(emscripten::val readyCallback);
-    bool resume();
     EMSCRIPTEN_WEBAUDIO_T audioContext;
 
 private:
@@ -21,18 +20,11 @@ private:
 
     static void onAudioThreadInitialized(EMSCRIPTEN_WEBAUDIO_T audioContext, bool success, void *userData);
     static void onAudioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T audioContext, bool success, void *userData);
-
-    // Teensy Audio Library objects
-    AudioSynthNoiseWhite *noise1;
-    AudioOutputI2S *i2s1;
-    AudioConnection *patchCord1;
-    AudioConnection *patchCord2;
 };
 
 EMSCRIPTEN_BINDINGS(perichord_bindings)
 {
     emscripten::class_<PerichordAudioWorklet>("PerichordAudioWorklet")
         .constructor<emscripten::val>()
-        .function("resume", &PerichordAudioWorklet::resume)
         .property("audioContext", &PerichordAudioWorklet::audioContext);
 }

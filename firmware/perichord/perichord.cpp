@@ -3,13 +3,13 @@
 #include "perichord.h"
 #include <emscripten/em_math.h>
 #include <emscripten/webaudio.h>
+#include <limits>
+
+const float INT16_TO_FLOAT_SCALE = std::numeric_limits<int16_t>::max() + 1.0f; // Converts int16_t [-32768, 32767] to float [-1.0, 1.0]
 
 extern AudioOutputI2S DAC_out;
 extern void setup();
 extern void loop();
-
-// Global pointer to the output for the audio callback
-static AudioOutputI2S *g_audioOutput = nullptr;
 
 bool GenerateAudioFromTeensy(int numInputs, const AudioSampleFrame *inputs,
                              int numOutputs, AudioSampleFrame *outputs,
@@ -32,8 +32,8 @@ bool GenerateAudioFromTeensy(int numInputs, const AudioSampleFrame *inputs,
 
         for (int i = 0; i < samplesPerChannel; ++i)
         {
-            float leftSample = leftChannel[i] / 32768.0f;
-            float rightSample = rightChannel[i] / 32768.0f;
+            float leftSample = leftChannel[i] / INT16_TO_FLOAT_SCALE;
+            float rightSample = rightChannel[i] / INT16_TO_FLOAT_SCALE;
 
             if (numChannels == 1)
             {
@@ -98,8 +98,7 @@ void PerichordAudioWorklet::onAudioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T
     emscripten_set_main_loop(loop, 0, false);
 }
 
-PerichordAudioWorklet::PerichordAudioWorklet(emscripten::val readyCallback)
-    : readyCallback(readyCallback), noise1(nullptr), i2s1(nullptr), patchCord1(nullptr), patchCord2(nullptr)
+PerichordAudioWorklet::PerichordAudioWorklet(emscripten::val readyCallback) : readyCallback(readyCallback)
 {
 
     EM_ASM({
@@ -114,14 +113,4 @@ PerichordAudioWorklet::PerichordAudioWorklet(emscripten::val readyCallback)
     audioContext = emscripten_create_audio_context(0);
     emscripten_start_wasm_audio_worklet_thread_async(audioContext, audioThreadStack, sizeof(audioThreadStack),
                                                      &onAudioThreadInitialized, this);
-}
-
-bool PerichordAudioWorklet::resume()
-{
-    if (emscripten_audio_context_state(audioContext) != AUDIO_CONTEXT_STATE_RUNNING)
-    {
-        emscripten_resume_audio_context_sync(audioContext);
-        return true;
-    }
-    return false;
 }

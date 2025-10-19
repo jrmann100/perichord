@@ -1,6 +1,12 @@
 import perichordModule from "./dist/perichord.js";
+import * as def from "./def.js"
+
+const HIGH = 1;
+const LOW = 0;
+const INPUT = 0;
 
 const rgbled = document.getElementById("rgbled");
+const rhythmled = document.getElementById("rhythmled");
 const powerButton = document.getElementById("power");
 const pgmUpButton = document.getElementById("pgm-up");
 const pgmDownButton = document.getElementById("pgm-down");
@@ -85,39 +91,37 @@ const powerLED = new (class {
 
   update() {
     const { h, s, v } = this.hsv;
-    rgbled.style.backgroundColor =  `hsl(${h}, ${s * 100}%, ${v * 60}%)`
+    rgbled.style.backgroundColor = `hsl(${h}, ${s * 100}%, ${v * 60}%)`
   }
 
 })();
 
 perichord.addEventListener("analogwrite", (e) => {
   const { pin, value } = e.detail;
-  if (pin === 0) {
+  if (pin === def.R_LED_PIN) {
     powerLED.r = value;
   }
-  if (pin === 1) {
+  if (pin === def.G_LED_PIN) {
     powerLED.g = value;
   }
-  if (pin === 2) {
+  if (pin === def.B_LED_PIN) {
     powerLED.b = value;
+  }
+  if (pin === def.RYTHM_LED_PIN) {
+    rhythmled.style.backgroundColor = value > 0 ? 'hsl(0, 100%, 60%)' : 'black';
   }
 });
 
-const DOWN_PGM_PIN = 8;
-const UP_PGM_PIN = 9;
-const HOLD_BUTTON_PIN = 11;
-const HIGH = 1;
-const LOW = 0;
 
 class Pin {
   #ptr;
   constructor(pin, ptr) {
     let button = null;
-    if (pin === DOWN_PGM_PIN) {
+    if (pin === def.DOWN_PGM_PIN) {
       button = pgmDownButton;
-    } else if (pin === UP_PGM_PIN) {
+    } else if (pin === def.UP_PGM_PIN) {
       button = pgmUpButton;
-    } else if (pin === HOLD_BUTTON_PIN) {
+    } else if (pin === def.HOLD_BUTTON_PIN) {
       button = holdButton;
     }
     if (button) {
@@ -148,8 +152,7 @@ class Pin {
 }
 
 perichord.addEventListener("pinmode", ({ detail: { pin, mode, ptr } }) => {
-  if (mode !== 0) {
-    // INPUT
+  if (mode !== INPUT) {
     return;
   }
   new Pin(pin, ptr);
