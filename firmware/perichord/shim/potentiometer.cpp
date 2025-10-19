@@ -83,7 +83,18 @@ bool potentiometer::update_parameter(bool alternate_flag)
 {
     // Normally this reads the ADC, applies smoothing and thresholding, and then
     // dispatches any changes via apply_audio_parameter(). The shim cannot read
-    // hardware, so we report no change.
-    (void)alternate_flag;
+    // hardware, so we always report 50%
+    if (apply_audio_parameter)
+    {
+        if (alternate_flag)
+        {
+            apply_audio_parameter(alternate_adress, 50);
+        }
+        else
+        {
+            apply_audio_parameter(main_adress, 50);
+        }
+        return true; // Report that a change was made
+    }
     return false;
 }
