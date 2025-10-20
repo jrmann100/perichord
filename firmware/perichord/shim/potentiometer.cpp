@@ -88,11 +88,11 @@ bool potentiometer::update_parameter(bool alternate_flag)
     {
         if (alternate_flag)
         {
-            apply_audio_parameter(alternate_adress, 50);
+            apply_audio_parameter(alternate_adress, main_range);
         }
         else
         {
-            apply_audio_parameter(main_adress, 50);
+            apply_audio_parameter(main_adress, main_range);
         }
         return true; // Report that a change was made
     }

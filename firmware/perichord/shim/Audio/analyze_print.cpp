@@ -74,7 +74,12 @@ void AudioAnalyzePrint::update(void)
 			count -= n;
 			while (n > 0)
 			{
-				Serial.println(block->data[offset++]);
+				sample_counter++;
+				if (sample_counter % 509 == 0)
+				{
+					Serial.println(block->data[offset]);
+				}
+				offset++;
 				n--;
 			}
 			if (count == 0)

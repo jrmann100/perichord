@@ -34,7 +34,7 @@ class AudioAnalyzePrint : public AudioStream
 {
 public:
 	AudioAnalyzePrint(void) : AudioStream(1, inputQueueArray),
-							  myname(NULL), state(0), trigger_edge(0), delay_length(0), print_length(500) {}
+							  myname(NULL), state(0), trigger_edge(0), delay_length(0), print_length(10000000), sample_counter(0) {}
 	virtual void update(void);
 	void name(const char *str) { myname = str; }
 	void trigger(void);
@@ -50,6 +50,7 @@ private:
 	uint32_t delay_length; // number of samples between trigger and printing
 	uint32_t print_length; // number of samples to print
 	uint32_t count;
+	uint32_t sample_counter;
 	audio_block_t *inputQueueArray[1];
 };
 

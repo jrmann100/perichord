@@ -356,8 +356,6 @@ AudioConnection patchCord185(voice1_tremolo_mult, 0, chord_voice_mixer, 0);
 AudioConnection patchCord186(string_waveshape, 0, string_waveshaper_mix, 1);
 AudioConnection patchCord187(string_waveshaper_mix, 0, strings_effect_mix, 0);
 AudioConnection patchCord188(string_waveshaper_mix, 0, string_delay_mix, 0);
-AudioAnalyzePrint analyzer;
-AudioConnection patchCord9001(voice1_filter, 0, analyzer, 0);
 AudioConnection patchCord189(chord_voice_mixer, chord_waveshape);
 AudioConnection patchCord190(chord_voice_mixer, 0, chord_waveshaper_mix, 0);
 AudioConnection patchCord191(filter_delay_strings, 0, string_delay_mix, 1);
@@ -442,3 +440,6 @@ AudioConnection patchCord2024(stereo_r_mixer, 0, DAC_out, 0);
 
 AudioConnection patchCord2025(stereo_l_mixer, 0, USB_out, 1);
 AudioConnection patchCord2026(stereo_r_mixer, 0, USB_out, 0);
+
+AudioAnalyzePrint analyzer;
+AudioConnection patchCord9001(chords_r_stereo_multiply, 0, analyzer, 0);
