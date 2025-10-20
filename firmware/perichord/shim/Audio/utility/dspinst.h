@@ -1,375 +1,369 @@
-/* Audio Library for Teensy 3.X
- * Copyright (c) 2014, Paul Stoffregen, paul@pjrc.com
+/* dspinst_wasm.h
  *
- * Development of this audio library was funded by PJRC.COM, LLC by sales of
- * Teensy and Audio Adaptor boards.  Please support PJRC's efforts to develop
- * open source software by purchasing Teensy or other PJRC products.
+ * WASM-friendly replacements of Teensy DSP intrinsics / asm.
+ * Implements the same semantics as the ARM inline asm in the original
+ * Teensy Audio Library, but in portable C for use under Emscripten/WASM.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Usage:
+ *   #include "dspinst_wasm.h"
  *
- * The above copyright notice, development funding notice, and this permission
- * notice shall be included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
+ * The original file used inline asm for __ARM_ARCH_7EM__ and KINETISL;
+ * this header provides the equivalent implementations for non-ARM builds.
  */
 
-#ifndef dspinst_h_
-#define dspinst_h_
+#ifndef DSPINST_WASM_H_
+#define DSPINST_WASM_H_
 
+#include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 
-// computes limit((val >> rshift), 2**bits)
+/* portable arithmetic right shift for 32-bit signed values (no UB) */
+static inline int32_t arith_rshift32(int32_t v, int s)
+{
+	if (s <= 0)
+		return v;
+	/* shift unsigned bits then sign-extend if negative */
+	uint32_t uv = (uint32_t)v;
+	uint32_t shifted = uv >> (unsigned)s;
+	if (v < 0)
+	{
+		uint32_t mask = ~((uint32_t)0 >> (unsigned)s);
+		shifted |= mask;
+	}
+	return (int32_t)shifted;
+}
+
+/* clamp helpers */
+static inline int32_t clamp_i32_from_i64(int64_t x)
+{
+	if (x > INT32_MAX)
+		return INT32_MAX;
+	if (x < INT32_MIN)
+		return INT32_MIN;
+	return (int32_t)x;
+}
+static inline int16_t clamp_i16_from_i32(int32_t x)
+{
+	if (x > INT16_MAX)
+		return INT16_MAX;
+	if (x < INT16_MIN)
+		return INT16_MIN;
+	return (int16_t)x;
+}
+
+/* ---------- public API (same signatures as original) ---------- */
+
+/* computes limit((val >> rshift), 2**bits) */
 static inline int32_t signed_saturate_rshift(int32_t val, int bits, int rshift) __attribute__((always_inline, unused));
 static inline int32_t signed_saturate_rshift(int32_t val, int bits, int rshift)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("ssat %0, %1, %2, asr %3" : "=r" (out) : "I" (bits), "r" (val), "I" (rshift));
-	return out;
-#elif defined(KINETISL)
-	int32_t out, max;
-	out = val >> rshift;
-	max = 1 << (bits - 1);
-	if (out >= 0) {
-		if (out > max - 1) out = max - 1;
-	} else {
-		if (out < -max) out = -max;
-	}
-	return out;
-#endif
+	/* arithmetic right shift, then saturate to signed 'bits' width */
+	int32_t v = arith_rshift32(val, rshift);
+	if (bits <= 0)
+		return 0;
+	if (bits >= 32)
+		return v;
+	int32_t max = (1u << (bits - 1)) - 1;
+	int32_t min = -(1u << (bits - 1));
+	if (v > max)
+		return max;
+	if (v < min)
+		return min;
+	return v;
 }
 
-// computes limit(val, 2**bits)
+/* computes limit(val, 2**bits) */
 static inline int16_t saturate16(int32_t val) __attribute__((always_inline, unused));
 static inline int16_t saturate16(int32_t val)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int16_t out;
-	int32_t tmp;
-	asm volatile("ssat %0, %1, %2" : "=r" (tmp) : "I" (16), "r" (val) );
-	out = (int16_t) (tmp);
-	return out;
-#else
-    if (val > 32767) val = 32767;
-    else if (val < -32768) val = -32768;
-    return val;
-#endif
+	return clamp_i16_from_i32(val);
 }
 
-// computes ((a[31:0] * b[15:0]) >> 16)
+/* computes ((a[31:0] * b[15:0]) >> 16) */
 static inline int32_t signed_multiply_32x16b(int32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_multiply_32x16b(int32_t a, uint32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smulwb %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return ((int64_t)a * (int16_t)(b & 0xFFFF)) >> 16;
-#endif
+	int32_t b16 = (int16_t)(b & 0xFFFF);
+	int64_t prod = (int64_t)a * (int64_t)b16;
+	return (int32_t)(prod >> 16);
 }
 
-// computes ((a[31:0] * b[31:16]) >> 16)
+/* computes ((a[31:0] * b[31:16]) >> 16) */
 static inline int32_t signed_multiply_32x16t(int32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_multiply_32x16t(int32_t a, uint32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smulwt %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return ((int64_t)a * (int16_t)(b >> 16)) >> 16;
-#endif
+	int32_t b16 = (int16_t)((b >> 16) & 0xFFFF);
+	int64_t prod = (int64_t)a * (int64_t)b16;
+	return (int32_t)(prod >> 16);
 }
 
-// computes (((int64_t)a[31:0] * (int64_t)b[31:0]) >> 32)
+/* computes (((int64_t)a * (int64_t)b) >> 32) */
 static inline int32_t multiply_32x32_rshift32(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_32x32_rshift32(int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smmul %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return ((int64_t)a * (int64_t)b) >> 32;
-#endif
+	int64_t prod = (int64_t)a * (int64_t)b;
+	/* arithmetic right shift of 64-bit signed is implementation-defined
+	   but common compilers do arithmetic; use helper to be explicit. */
+	return (int32_t)(prod >> 32);
 }
 
-// computes (((int64_t)a[31:0] * (int64_t)b[31:0] + 0x8000000) >> 32)
+/* computes (((int64_t)a * (int64_t)b + 0x8000000) >> 32) */
 static inline int32_t multiply_32x32_rshift32_rounded(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_32x32_rshift32_rounded(int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smmulr %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return (((int64_t)a * (int64_t)b) + 0x8000000) >> 32;
-#endif
+	int64_t prod = (int64_t)a * (int64_t)b;
+	prod += (int64_t)0x08000000; /* rounding constant */
+	return (int32_t)(prod >> 32);
 }
 
-// computes sum + (((int64_t)a[31:0] * (int64_t)b[31:0] + 0x8000000) >> 32)
+/* computes sum + (((int64_t)a * (int64_t)b + 0x8000000) >> 32)
+   Implemented to wrap modulo 2^32 like the ARM instruction. */
 static inline int32_t multiply_accumulate_32x32_rshift32_rounded(int32_t sum, int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_accumulate_32x32_rshift32_rounded(int32_t sum, int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smmlar %0, %2, %3, %1" : "=r" (out) : "r" (sum), "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return sum + ((((int64_t)a * (int64_t)b) + 0x8000000) >> 32);
-#endif
+	int64_t prod = (int64_t)a * (int64_t)b;
+	int32_t scaled = (int32_t)((prod + (int64_t)0x08000000) >> 32);
+	uint32_t u = (uint32_t)sum + (uint32_t)scaled;
+	return (int32_t)u;
 }
 
-// computes sum - (((int64_t)a[31:0] * (int64_t)b[31:0] + 0x8000000) >> 32)
+/* computes sum - (((int64_t)a * (int64_t)b + 0x8000000) >> 32)
+   Implemented with modulo-2^32 wrap like the ARM instruction. */
 static inline int32_t multiply_subtract_32x32_rshift32_rounded(int32_t sum, int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_subtract_32x32_rshift32_rounded(int32_t sum, int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("smmlsr %0, %2, %3, %1" : "=r" (out) : "r" (sum), "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return sum - ((((int64_t)a * (int64_t)b) + 0x8000000) >> 32);
-#endif
+	int64_t prod = (int64_t)a * (int64_t)b;
+	int32_t scaled = (int32_t)((prod + (int64_t)0x08000000) >> 32);
+	uint32_t u = (uint32_t)sum - (uint32_t)scaled;
+	return (int32_t)u;
 }
 
-
-// computes (a[31:16] | (b[31:16] >> 16))
+/* computes (a[31:16] | (b[31:16] >> 16)) */
 static inline uint32_t pack_16t_16t(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline uint32_t pack_16t_16t(int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("pkhtb %0, %1, %2, asr #16" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return (a & 0xFFFF0000) | ((uint32_t)b >> 16);
-#endif
+	return ((uint32_t)a & 0xFFFF0000u) | ((uint32_t)b >> 16);
 }
 
-// computes (a[31:16] | b[15:0])
+/* computes (a[31:16] | b[15:0]) */
 static inline uint32_t pack_16t_16b(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline uint32_t pack_16t_16b(int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("pkhtb %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
-#elif defined(KINETISL)
-	return (a & 0xFFFF0000) | (b & 0x0000FFFF);
-#endif
+	return ((uint32_t)a & 0xFFFF0000u) | ((uint32_t)b & 0x0000FFFFu);
 }
 
-// computes ((a[15:0] << 16) | b[15:0])
+/* computes ((a[15:0] << 16) | b[15:0]) */
 static inline uint32_t pack_16b_16b(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline uint32_t pack_16b_16b(int32_t a, int32_t b)
 {
-#if defined (__ARM_ARCH_7EM__)
-	int32_t out;
-	asm volatile("pkhbt %0, %1, %2, lsl #16" : "=r" (out) : "r" (b), "r" (a));
-	return out;
-#elif defined(KINETISL)
-	return (a << 16) | (b & 0x0000FFFF);
-#endif
+	return (((uint32_t)a & 0x0000FFFFu) << 16) | ((uint32_t)b & 0x0000FFFFu);
 }
 
-// computes ((a[15:0] << 16) | b[15:0])
-/*
-static inline uint32_t pack_16x16(int32_t a, int32_t b) __attribute__((always_inline, unused));
-static inline uint32_t pack_16x16(int32_t a, int32_t b)
-{
-	int32_t out;
-	asm volatile("pkhbt %0, %1, %2, lsl #16" : "=r" (out) : "r" (b), "r" (a));
-	return out;
-}
-*/
-#if defined (__ARM_ARCH_7EM__)
-// computes (((a[31:16] + b[31:16]) << 16) | (a[15:0 + b[15:0]))  (saturates)
+/* ---------- 16-bit pairwise saturating / halving / multiply helpers ---------- */
+
+/* qadd16: per-half saturating add, pack back */
 static inline uint32_t signed_add_16_and_16(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline uint32_t signed_add_16_and_16(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("qadd16 %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+
+	int32_t r_lo = clamp_i16_from_i32(a_lo + b_lo);
+	int32_t r_hi = clamp_i16_from_i32(a_hi + b_hi);
+
+	return ((uint32_t)(uint16_t)r_hi << 16) | (uint16_t)r_lo;
 }
 
-// computes (((a[31:16] - b[31:16]) << 16) | (a[15:0 - b[15:0]))  (saturates)
+/* qsub16: per-half saturating subtract, pack back */
 static inline int32_t signed_subtract_16_and_16(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_subtract_16_and_16(int32_t a, int32_t b)
 {
-	int32_t out;
-	asm volatile("qsub16 %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+
+	int32_t r_lo = clamp_i16_from_i32(a_lo - b_lo);
+	int32_t r_hi = clamp_i16_from_i32(a_hi - b_hi);
+
+	return (int32_t)(((uint32_t)(uint16_t)r_hi << 16) | (uint16_t)r_lo);
 }
 
-// computes out = (((a[31:16]+b[31:16])/2) <<16) | ((a[15:0]+b[15:0])/2)
+/* shadd16: per-half arithmetic halving add, pack back */
 static inline int32_t signed_halving_add_16_and_16(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_halving_add_16_and_16(int32_t a, int32_t b)
 {
-	int32_t out;
-	asm volatile("shadd16 %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+
+	int32_t r_lo = (a_lo + b_lo) >> 1;
+	int32_t r_hi = (a_hi + b_hi) >> 1;
+
+	return (int32_t)(((uint32_t)(uint16_t)r_hi << 16) | (uint16_t)r_lo);
 }
 
-// computes out = (((a[31:16]-b[31:16])/2) <<16) | ((a[15:0]-b[15:0])/2)
+/* shsub16: per-half arithmetic halving subtract, pack back */
 static inline int32_t signed_halving_subtract_16_and_16(int32_t a, int32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_halving_subtract_16_and_16(int32_t a, int32_t b)
 {
-	int32_t out;
-	asm volatile("shsub16 %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+
+	int32_t r_lo = (a_lo - b_lo) >> 1;
+	int32_t r_hi = (a_hi - b_hi) >> 1;
+
+	return (int32_t)(((uint32_t)(uint16_t)r_hi << 16) | (uint16_t)r_lo);
 }
 
-// computes (sum + ((a[31:0] * b[15:0]) >> 16))
+/* smlawb: sum + ((a * low16(b)) >> 16), with defined 32-bit wrap like ARM */
 static inline int32_t signed_multiply_accumulate_32x16b(int32_t sum, int32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_multiply_accumulate_32x16b(int32_t sum, int32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smlawb %0, %2, %3, %1" : "=r" (out) : "r" (sum), "r" (a), "r" (b));
-	return out;
+	int32_t b_low = (int16_t)(b & 0xFFFF);
+	int64_t prod = (int64_t)a * (int64_t)b_low;
+	int32_t scaled = (int32_t)(prod >> 16);
+	uint32_t u = (uint32_t)sum + (uint32_t)scaled; /* modulo 2^32 wrap like ARM */
+	return (int32_t)u;
 }
 
-// computes (sum + ((a[31:0] * b[31:16]) >> 16))
+/* smlawt: sum + ((a * high16(b)) >> 16), with defined wrapping */
 static inline int32_t signed_multiply_accumulate_32x16t(int32_t sum, int32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t signed_multiply_accumulate_32x16t(int32_t sum, int32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smlawt %0, %2, %3, %1" : "=r" (out) : "r" (sum), "r" (a), "r" (b));
-	return out;
+	int32_t b_top = (int16_t)((b >> 16) & 0xFFFF);
+	int64_t prod = (int64_t)a * (int64_t)b_top;
+	int32_t scaled = (int32_t)(prod >> 16);
+	uint32_t u = (uint32_t)sum + (uint32_t)scaled;
+	return (int32_t)u;
 }
 
-// computes logical and, forces compiler to allocate register and use single cycle instruction
+/* logical and â€” original forced a register AND instruction;
+   here semantics are identical. */
 static inline uint32_t logical_and(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline uint32_t logical_and(uint32_t a, uint32_t b)
 {
-	asm volatile("and %0, %1" : "+r" (a) : "r" (b));
-	return a;
+	return a & b;
 }
 
-// computes ((a[15:0] * b[15:0]) + (a[31:16] * b[31:16]))
+/* pairwise 16x16 multiplies and adds (matching smuad / smuadx) */
+
+/* ((a[15:0] * b[15:0]) + (a[31:16] * b[31:16])) */
 static inline int32_t multiply_16tx16t_add_16bx16b(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16tx16t_add_16bx16b(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smuad %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+	return (int32_t)((int32_t)a_lo * b_lo + (int32_t)a_hi * b_hi);
 }
 
-// computes ((a[15:0] * b[31:16]) + (a[31:16] * b[15:0]))
+/* ((a[15:0] * b[31:16]) + (a[31:16] * b[15:0])) */
 static inline int32_t multiply_16tx16b_add_16bx16t(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16tx16b_add_16bx16t(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smuadx %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int32_t a_lo = (int16_t)(a & 0xFFFF);
+	int32_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int32_t b_lo = (int16_t)(b & 0xFFFF);
+	int32_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+	return (int32_t)((int32_t)a_lo * b_hi + (int32_t)a_hi * b_lo);
 }
 
-// // computes sum += ((a[15:0] * b[15:0]) + (a[31:16] * b[31:16]))
+/* multiply accumulate into 64-bit accumulator (smlald / smlaldx equivalents) */
+
+/* sum += ((a_lo*b_lo) + (a_hi*b_hi)) */
+static inline int64_t multiply_accumulate_16tx16t_add_16bx16b(int64_t sum, uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int64_t multiply_accumulate_16tx16t_add_16bx16b(int64_t sum, uint32_t a, uint32_t b)
 {
-	asm volatile("smlald %Q0, %R0, %1, %2" : "+r" (sum) : "r" (a), "r" (b));
-	return sum;
+	int64_t a_lo = (int16_t)(a & 0xFFFF);
+	int64_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int64_t b_lo = (int16_t)(b & 0xFFFF);
+	int64_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+	return sum + a_lo * b_lo + a_hi * b_hi;
 }
 
-// // computes sum += ((a[15:0] * b[31:16]) + (a[31:16] * b[15:0]))
+/* sum += ((a_lo*b_hi) + (a_hi*b_lo)) */
+static inline int64_t multiply_accumulate_16tx16b_add_16bx16t(int64_t sum, uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int64_t multiply_accumulate_16tx16b_add_16bx16t(int64_t sum, uint32_t a, uint32_t b)
 {
-	asm volatile("smlaldx %Q0, %R0, %1, %2" : "+r" (sum) : "r" (a), "r" (b));
-	return sum;
+	int64_t a_lo = (int16_t)(a & 0xFFFF);
+	int64_t a_hi = (int16_t)((a >> 16) & 0xFFFF);
+	int64_t b_lo = (int16_t)(b & 0xFFFF);
+	int64_t b_hi = (int16_t)((b >> 16) & 0xFFFF);
+	return sum + a_lo * b_hi + a_hi * b_lo;
 }
 
-// computes ((a[15:0] * b[15:0])
+/* 16x16 single lane multiplies */
 static inline int32_t multiply_16bx16b(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16bx16b(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smulbb %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	return (int32_t)((int16_t)(a & 0xFFFF) * (int16_t)(b & 0xFFFF));
 }
-
-// computes ((a[15:0] * b[31:16])
 static inline int32_t multiply_16bx16t(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16bx16t(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smulbt %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	return (int32_t)((int16_t)(a & 0xFFFF) * (int16_t)((b >> 16) & 0xFFFF));
 }
-
-// computes ((a[31:16] * b[15:0])
 static inline int32_t multiply_16tx16b(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16tx16b(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smultb %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	return (int32_t)((int16_t)((a >> 16) & 0xFFFF) * (int16_t)(b & 0xFFFF));
 }
-
-// computes ((a[31:16] * b[31:16])
 static inline int32_t multiply_16tx16t(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t multiply_16tx16t(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("smultt %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	return (int32_t)((int16_t)((a >> 16) & 0xFFFF) * (int16_t)((b >> 16) & 0xFFFF));
 }
 
-// computes (a - b), result saturated to 32 bit integer range
+/* computes (a - b), result saturated to 32 bit signed integer range (qsub 32-bit) */
 static inline int32_t substract_32_saturate(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
 static inline int32_t substract_32_saturate(uint32_t a, uint32_t b)
 {
-	int32_t out;
-	asm volatile("qsub %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
-	return out;
+	int64_t da = (int64_t)(int32_t)a;
+	int64_t db = (int64_t)(int32_t)b;
+	int64_t diff = da - db;
+	return clamp_i32_from_i64(diff);
 }
 
-// Multiply two S.31 fractional integers, and return the 32 most significant
-// bits after a shift left by the constant z.
-// This comes from rockbox.org
-
+/* Multiply two S.31 fractional integers, and return the 32 most significant
+ * bits after a shift left by the constant z (0 <= z <= 31).
+ * Implemented as (int32_t)(( (int64_t)x * (int64_t)y ) >> (31 - z))
+ */
+static inline int32_t FRACMUL_SHL(int32_t x, int32_t y, int z) __attribute__((always_inline, unused));
 static inline int32_t FRACMUL_SHL(int32_t x, int32_t y, int z)
 {
-    int32_t t, t2;
-    asm ("smull    %[t], %[t2], %[a], %[b]\n\t"
-         "mov      %[t2], %[t2], asl %[c]\n\t"
-         "orr      %[t], %[t2], %[t], lsr %[d]\n\t"
-         : [t] "=&r" (t), [t2] "=&r" (t2)
-         : [a] "r" (x), [b] "r" (y),
-           [c] "Mr" ((z) + 1), [d] "Mr" (31 - (z)));
-    return t;
+	if (z < 0)
+		z = 0;
+	if (z > 31)
+		z = 31;
+	int64_t prod = (int64_t)x * (int64_t)y;
+	int shift = 31 - z;
+	if (shift >= 0)
+		return (int32_t)(prod >> shift);
+	else
+		return (int32_t)(prod << (-shift));
 }
 
-#endif
-
-//get Q from PSR
+/* get Q from PSR -- no PSR in WASM, return 0 */
 static inline uint32_t get_q_psr(void) __attribute__((always_inline, unused));
 static inline uint32_t get_q_psr(void)
 {
-  uint32_t out;
-  asm ("mrs %0, APSR" : "=r" (out));
-  return (out & 0x8000000)>>27;
+	return 0u;
 }
 
-//clear Q BIT in PSR
+/* clear Q BIT in PSR -- no-op for WASM */
 static inline void clr_q_psr(void) __attribute__((always_inline, unused));
 static inline void clr_q_psr(void)
 {
-  uint32_t t;
-  asm ("mov %[t],#0\n"
-       "msr APSR_nzcvq,%0\n" : [t] "=&r" (t)::"cc");
+	/* no-op */
+	(void)0;
 }
 
-
-#endif
+#endif /* DSPINST_WASM_H_ */

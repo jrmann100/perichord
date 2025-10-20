@@ -24,55 +24,32 @@
  * THE SOFTWARE.
  */
 
-#ifndef mixer_h_
-#define mixer_h_
+#ifndef analyze_print_h_
+#define analyze_print_h_
 
 #include <Arduino.h>	 // github.com/PaulStoffregen/cores/blob/master/teensy4/Arduino.h
 #include <AudioStream.h> // github.com/PaulStoffregen/cores/blob/master/teensy4/AudioStream.h
 
-class AudioMixer4 : public AudioStream
+class AudioAnalyzePrint : public AudioStream
 {
 public:
-	AudioMixer4(void) : AudioStream(4, inputQueueArray)
-	{
-		for (int i = 0; i < 4; i++)
-			multiplier[i] = 65536;
-	}
+	AudioAnalyzePrint(void) : AudioStream(1, inputQueueArray),
+							  myname(NULL), state(0), trigger_edge(0), delay_length(0), print_length(500) {}
 	virtual void update(void);
-	void gain(unsigned int channel, float gain)
-	{
-		if (channel >= 4)
-			return;
-		if (gain > 32767.0f)
-			gain = 32767.0f;
-		else if (gain < -32767.0f)
-			gain = -32767.0f;
-		multiplier[channel] = gain * 65536.0f; // TODO: proper roundoff?
-	}
+	void name(const char *str) { myname = str; }
+	void trigger(void);
+	void trigger(float level, int edge);
+	void delay(uint32_t num) { delay_length = num; }
+	void length(uint32_t num) { print_length = num; }
 
 private:
-	int32_t multiplier[4];
-	audio_block_t *inputQueueArray[4];
-};
-
-class AudioAmplifier : public AudioStream
-{
-public:
-	AudioAmplifier(void) : AudioStream(1, inputQueueArray), multiplier(65536)
-	{
-	}
-	virtual void update(void);
-	void gain(float n)
-	{
-		if (n > 32767.0f)
-			n = 32767.0f;
-		else if (n < -32767.0f)
-			n = -32767.0f;
-		multiplier = n * 65536.0f;
-	}
-
-private:
-	int32_t multiplier;
+	const char *myname;
+	uint8_t state;
+	uint8_t trigger_edge; // trigger type, 0=none, 2=RISING, 3=FALLING
+	int16_t trigger_level;
+	uint32_t delay_length; // number of samples between trigger and printing
+	uint32_t print_length; // number of samples to print
+	uint32_t count;
 	audio_block_t *inputQueueArray[1];
 };
 

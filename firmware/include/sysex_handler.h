@@ -613,7 +613,7 @@ void apply_audio_parameter(int adress, int value) {
         chords_effect_mix.gain(1,value/100.0);
         break;
       case 184:
-        reverb_mixer.gain(1,value/100.0);chords_r_stereo_gain.amplitude(1.0-reverb_dry_proportion*value/100.0,100);chords_l_stereo_gain.amplitude((1.0-reverb_dry_proportion*value/100.0)*pan,100);
+        reverb_mixer.gain(1,value/100.0);chords_l_stereo_gain.amplitude(1.0-reverb_dry_proportion*value/100.0,100);chords_r_stereo_gain.amplitude((1.0-reverb_dry_proportion*value/100.0)*pan,100);
         break;
       case 185:
         chord_waveshaper_mix.gain(0,1-value/100.0);chord_waveshaper_mix.gain(1,value/100.0);

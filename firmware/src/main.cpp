@@ -1031,6 +1031,7 @@ void handle_chords_button()
     int value = chord_matrix_array[i].read_transition();
     if (value > 1 && !inhibit_button)
     {
+      analyzer.trigger();
       button_pushed = true;
       Serial.print("Button pushed: ");
       Serial.println(i);

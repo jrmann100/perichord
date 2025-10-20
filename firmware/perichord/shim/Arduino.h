@@ -5,10 +5,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <emscripten.h>
+#include <functional>
 #include <stdint.h>
 #include <stdio.h>
 #include <string>
 #include <time.h>
+#include <vector>
 
 class String : public std::string
 {
@@ -83,13 +85,38 @@ public:
 #define __disable_irq() ((void)0)
 #define __enable_irq() ((void)0)
 
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#include <functional>
+#include <vector>
+
 class IntervalTimer
 {
 public:
-    void begin(void (*f)(), unsigned long us) {}
-    void end() {}
+    void begin(std::function<void()> f, unsigned long us)
+    {
+        double ms = us / 1000.0;
+        auto *func = new std::function<void()>(f);
+        int timeoutId = emscripten_set_timeout([](void *userData)
+                                               {
+            auto* f = static_cast<std::function<void()>*>(userData);
+            (*f)();
+            delete f; }, ms, func);
+        timer_ids.push_back(timeoutId);
+    }
+    void end()
+    {
+        for (int id : timer_ids)
+        {
+            emscripten_clear_timeout(id);
+        }
+        timer_ids.clear();
+    }
     void priority(int p) {}
     void update(unsigned long us) {}
+
+private:
+    std::vector<int> timer_ids;
 };
 
 template <typename T>

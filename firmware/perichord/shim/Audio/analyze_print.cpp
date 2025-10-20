@@ -24,64 +24,91 @@
  * THE SOFTWARE.
  */
 
-#include "synth_whitenoise.h"
+#include "analyze_print.h"
 #include <Arduino.h>
 
-// Park-Miller-Carta Pseudo-Random Number Generator
-// http://www.firstpr.com.au/dsp/rand31/
+#define STATE_IDLE 0		 // doing nothing
+#define STATE_WAIT_TRIGGER 1 // looking for trigger condition
+#define STATE_DELAY 2		 // waiting from trigger to print
+#define STATE_PRINTING 3	 // printing data
 
-void AudioSynthNoiseWhite::update(void)
+void AudioAnalyzePrint::update(void)
 {
 	audio_block_t *block;
-	uint32_t *p, *end;
-	int32_t n1, n2, gain;
-	uint32_t lo, hi;
+	uint32_t offset = 0;
+	uint32_t remain, n;
 
-	gain = level;
-	if (gain == 0)
-		return;
-	block = allocate();
+	block = receiveReadOnly();
 	if (!block)
 		return;
-	p = (uint32_t *)(block->data);
-	end = p + AUDIO_BLOCK_SAMPLES / 2;
-	lo = seed;
-	do
-	{
-		uint32_t val1, val2;
 
-		hi = multiply_16bx16t(16807, lo); // 16807 * (lo >> 16)
-		lo = 16807 * (lo & 0xFFFF);
-		lo += (hi & 0x7FFF) << 16;
-		lo += hi >> 15;
-		lo = (lo & 0x7FFFFFFF) + (lo >> 31);
-		n1 = signed_multiply_32x16b(gain, lo);
-		hi = multiply_16bx16t(16807, lo); // 16807 * (lo >> 16)
-		lo = 16807 * (lo & 0xFFFF);
-		lo += (hi & 0x7FFF) << 16;
-		lo += hi >> 15;
-		lo = (lo & 0x7FFFFFFF) + (lo >> 31);
-		n2 = signed_multiply_32x16b(gain, lo);
-		val1 = pack_16b_16b(n2, n1);
-		hi = multiply_16bx16t(16807, lo); // 16807 * (lo >> 16)
-		lo = 16807 * (lo & 0xFFFF);
-		lo += (hi & 0x7FFF) << 16;
-		lo += hi >> 15;
-		lo = (lo & 0x7FFFFFFF) + (lo >> 31);
-		n1 = signed_multiply_32x16b(gain, lo);
-		hi = multiply_16bx16t(16807, lo); // 16807 * (lo >> 16)
-		lo = 16807 * (lo & 0xFFFF);
-		lo += (hi & 0x7FFF) << 16;
-		lo += hi >> 15;
-		lo = (lo & 0x7FFFFFFF) + (lo >> 31);
-		n2 = signed_multiply_32x16b(gain, lo);
-		val2 = pack_16b_16b(n2, n1);
-		*p++ = val1;
-		*p++ = val2;
-	} while (p < end);
-	seed = lo;
-	transmit(block);
+	while (offset < AUDIO_BLOCK_SAMPLES)
+	{
+		remain = AUDIO_BLOCK_SAMPLES - offset;
+		switch (state)
+		{
+		case STATE_WAIT_TRIGGER:
+			// TODO: implement this....
+			offset = AUDIO_BLOCK_SAMPLES;
+			break;
+
+		case STATE_DELAY:
+			// Serial.printf("STATE_DELAY, count = %u\n", count);
+			if (remain < count)
+			{
+				count -= remain;
+				offset = AUDIO_BLOCK_SAMPLES;
+			}
+			else
+			{
+				offset += count;
+				count = print_length;
+				state = STATE_PRINTING;
+			}
+			break;
+
+		case STATE_PRINTING:
+			n = count;
+			if (n > remain)
+				n = remain;
+			count -= n;
+			while (n > 0)
+			{
+				Serial.println(block->data[offset++]);
+				n--;
+			}
+			if (count == 0)
+				state = STATE_IDLE;
+			break;
+
+		default: // STATE_IDLE
+			offset = AUDIO_BLOCK_SAMPLES;
+			break;
+		}
+	}
 	release(block);
 }
 
-uint16_t AudioSynthNoiseWhite::instance_count = 0;
+void AudioAnalyzePrint::trigger(void)
+{
+	uint32_t n = delay_length;
+
+	if (n > 0)
+	{
+		Serial.print("trigger ");
+		if (myname)
+			Serial.print(myname);
+		Serial.print(", delay=");
+		Serial.println(n);
+		count = n;
+		state = 2;
+	}
+	else
+	{
+		Serial.print("trigger ");
+		if (myname)
+			Serial.println(myname);
+		count = print_length;
+		state = 3;
+	}
+}

@@ -24,12 +24,11 @@
  * THE SOFTWARE.
  */
 
-#include <Arduino.h>
 #include "effect_multiply.h"
+#include <Arduino.h>
 
 void AudioEffectMultiply::update(void)
 {
-#if defined(__ARM_ARCH_7EM__)
 	audio_block_t *blocka, *blockb;
 	uint32_t *pa, *pb, *end;
 	uint32_t a12, a34; //, a56, a78;
@@ -37,37 +36,41 @@ void AudioEffectMultiply::update(void)
 
 	blocka = receiveWritable(0);
 	blockb = receiveReadOnly(1);
-	if (!blocka) {
-		if (blockb) release(blockb);
+	if (!blocka)
+	{
+		if (blockb)
+			release(blockb);
 		return;
 	}
-	if (!blockb) {
+	if (!blockb)
+	{
 		release(blocka);
 		return;
 	}
 	pa = (uint32_t *)(blocka->data);
 	pb = (uint32_t *)(blockb->data);
-	end = pa + AUDIO_BLOCK_SAMPLES/2;
-	while (pa < end) {
+	end = pa + AUDIO_BLOCK_SAMPLES / 2;
+	while (pa < end)
+	{
 		a12 = *pa;
-		a34 = *(pa+1);
-		//a56 = *(pa+2); // 8 samples/loop should work, but crashes.
-		//a78 = *(pa+3); // why?!  maybe a compiler bug??
+		a34 = *(pa + 1);
+		// a56 = *(pa+2); // 8 samples/loop should work, but crashes.
+		// a78 = *(pa+3); // why?!  maybe a compiler bug??
 		b12 = *pb++;
 		b34 = *pb++;
-		//b56 = *pb++;
-		//b78 = *pb++;
+		// b56 = *pb++;
+		// b78 = *pb++;
 		a12 = pack_16b_16b(
-			signed_saturate_rshift(multiply_16tx16t(a12, b12), 16, 15), 
+			signed_saturate_rshift(multiply_16tx16t(a12, b12), 16, 15),
 			signed_saturate_rshift(multiply_16bx16b(a12, b12), 16, 15));
 		a34 = pack_16b_16b(
-			signed_saturate_rshift(multiply_16tx16t(a34, b34), 16, 15), 
+			signed_saturate_rshift(multiply_16tx16t(a34, b34), 16, 15),
 			signed_saturate_rshift(multiply_16bx16b(a34, b34), 16, 15));
-		//a56 = pack_16b_16b(
-		//	signed_saturate_rshift(multiply_16tx16t(a56, b56), 16, 15), 
+		// a56 = pack_16b_16b(
+		//	signed_saturate_rshift(multiply_16tx16t(a56, b56), 16, 15),
 		//	signed_saturate_rshift(multiply_16bx16b(a56, b56), 16, 15));
-		//a78 = pack_16b_16b(
-		//	signed_saturate_rshift(multiply_16tx16t(a78, b78), 16, 15), 
+		// a78 = pack_16b_16b(
+		//	signed_saturate_rshift(multiply_16tx16t(a78, b78), 16, 15),
 		//	signed_saturate_rshift(multiply_16bx16b(a78, b78), 16, 15));
 		*pa++ = a12;
 		*pa++ = a34;
@@ -77,14 +80,4 @@ void AudioEffectMultiply::update(void)
 	transmit(blocka);
 	release(blocka);
 	release(blockb);
-
-#elif defined(KINETISL)
-	audio_block_t *block;
-
-	block = receiveReadOnly(0);
-	if (block) release(block);
-	block = receiveReadOnly(1);
-	if (block) release(block);
-#endif
 }
-
