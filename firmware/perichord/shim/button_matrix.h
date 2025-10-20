@@ -15,7 +15,7 @@ public:
    * @param read_pin_2 the second pin to read
    * @param read_pin_3 the third pin to read
    */
-  button_matrix(uint8_t d_in, uint8_t storage_clock, uint8_t shift_clock, uint8_t read_pin_1, uint8_t read_pin_2, uint8_t read_pin_3);
+  button_matrix(uint8_t d_in, uint8_t storage_clock, uint8_t shift_clock, uint8_t read_pin_1, uint8_t read_pin_2, uint8_t read_pin_3) {};
 
   void setup();
   void update(debouncer (&data_array)[22]);

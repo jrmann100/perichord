@@ -11,9 +11,13 @@
   fill: black;
 }
 
-:is(#up-pgm-button, #down-pgm-button, #hold-button, .chord-matrix-button):not(
-    [aria-disabled="true"]
-  ) {
+:is(
+    #up-pgm-button,
+    #down-pgm-button,
+    #hold-button,
+    .chord-button,
+    .harp-button
+  ):not([aria-disabled="true"]) {
   fill: lightgray;
   cursor: pointer;
 }

@@ -10,7 +10,8 @@ const els = Object.fromEntries(
     powerButton: "#power-button",
     rhythmLed: "#rhythm-led",
     holdButton: "#hold-button",
-    chordMatrixButtons: ".chord-matrix-button",
+    chordButtons: ".chord-button",
+    harpButtons: ".harp-button",
     rgbLed: "#rgb-led",
     chordPot: "#chord-pot",
     harpPot: "#harp-pot",
@@ -32,7 +33,8 @@ const disabled = (el, state) => el.setAttribute("aria-disabled", state);
 
 [
   els.holdButton,
-  ...els.chordMatrixButtons,
+  ...els.chordButtons,
+  ...els.harpButtons,
   els.upPgmButton,
   els.downPgmButton,
 ].forEach((el) => disabled(el, true));
@@ -177,11 +179,11 @@ perichord.addEventListener("pinmode", ({ detail: { pin, mode, ptr } }) => {
   new Pin(pin, ptr);
 });
 
-perichord.addEventListener("buttonmatrix-setup", (e) => {
+perichord.addEventListener("chord-setup", (e) => {
   // TODO: I believe you have to init dataview every time in case memory grows;
   // we might later just fix memory size once we're sure we don't need to grow it
   // and then we can cache one big dataview and just index into it.
-  els.chordMatrixButtons.forEach((button, index) => {
+  els.chordButtons.forEach((button, index) => {
     disabled(button, false);
     const setTo = (value) => () => {
       const view = new DataView(
@@ -191,7 +193,26 @@ perichord.addEventListener("buttonmatrix-setup", (e) => {
       );
       view.setUint8(0, value);
     };
-    button.addEventListener("mousedown", setTo(HIGH));
-    button.addEventListener("mouseup", setTo(LOW));
+    button.addEventListener("pointerdown", setTo(HIGH));
+    button.addEventListener("pointerup", setTo(LOW));
+  });
+});
+
+perichord.addEventListener("harp-setup", (e) => {
+  // TODO: I believe you have to init dataview every time in case memory grows;
+  // we might later just fix memory size once we're sure we don't need to grow it
+  // and then we can cache one big dataview and just index into it.
+  els.harpButtons.forEach((button, index) => {
+    disabled(button, false);
+    const setTo = (value) => () => {
+      const view = new DataView(
+        perichord.wasmMemory.buffer,
+        e.detail + index,
+        1
+      );
+      view.setUint8(0, value);
+    };
+    button.addEventListener("pointerenter", setTo(HIGH));
+    button.addEventListener("pointerleave", setTo(LOW));
   });
 });
