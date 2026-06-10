@@ -140,11 +140,13 @@ void AudioStream::transmit(audio_block_t *block, unsigned char index)
     {
         if (conn->src == this && conn->src_index == index && conn->isConnected)
         {
-            // Route this block to the destination's input queue
+            // Route this block to the destination's input queue. Like the
+            // hardware library, only fill an empty slot — the destination
+            // takes ownership of the queued block when it receives it.
             if (conn->dst && conn->dest_index < conn->dst->num_inputs)
             {
-                // Store in the destination's input queue
-                if (conn->dst->inputQueue)
+                if (conn->dst->inputQueue &&
+                    conn->dst->inputQueue[conn->dest_index] == nullptr)
                 {
                     conn->dst->inputQueue[conn->dest_index] = block;
                     block->ref_count++; // Increment for this destination
@@ -157,19 +159,37 @@ void AudioStream::transmit(audio_block_t *block, unsigned char index)
 
 audio_block_t *AudioStream::receiveReadOnly(unsigned int index)
 {
-    // Pull from input queue
+    // Take the block out of the input queue, transferring ownership (and the
+    // queue's reference) to the caller, which must release() it when done.
+    // Leaving the pointer in the queue would replay the same block forever
+    // once the upstream source stops transmitting.
     if (index < num_inputs && inputQueue != nullptr)
     {
-        return inputQueue[index];
+        audio_block_t *in = inputQueue[index];
+        inputQueue[index] = nullptr;
+        return in;
     }
     return nullptr;
 }
 
 audio_block_t *AudioStream::receiveWritable(unsigned int index)
 {
-    // For writable access, we need a unique copy
-    // For now, just return the same as readonly
-    return receiveReadOnly(index);
+    // Like receiveReadOnly, but if other streams also hold a reference, hand
+    // back a private copy so in-place modification can't corrupt their data.
+    if (index >= num_inputs || inputQueue == nullptr)
+        return nullptr;
+
+    audio_block_t *in = inputQueue[index];
+    inputQueue[index] = nullptr;
+    if (in && in->ref_count > 1)
+    {
+        audio_block_t *p = allocate();
+        if (p)
+            memcpy(p->data, in->data, sizeof(p->data));
+        release(in);
+        in = p;
+    }
+    return in;
 }
 
 void AudioStream::update_all(void)
